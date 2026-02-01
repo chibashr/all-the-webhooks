@@ -4,7 +4,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.bukkit.entity.Player;
-import org.bukkit.world.World;
+import org.bukkit.World;
 
 public class EventContext {
     private final String eventKey;

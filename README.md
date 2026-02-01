@@ -3,6 +3,14 @@
 All the Webhooks is a Paper- and Folia-compatible plugin that forwards explicitly
 configured in-game events to one or more webhooks using YAML-driven rules.
 
+## Building and testing
+
+- Build (includes tests): `./gradlew build`
+- Run tests only: `./gradlew test`
+- Output JAR: `build/libs/`
+
+See `planning/testing.md` for test layout and coverage.
+
 ## Quick Start
 
 1. Build the plugin.

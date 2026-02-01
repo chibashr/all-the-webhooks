@@ -1,7 +1,9 @@
 # All the Webhooks — Event Rules
+# Event rules below are commented out so they do not fire on installation.
+# Uncomment the events you want to use.
 
 defaults:
-  enabled: true
+  enabled: false
   webhook: default
   message: generic
   require-permission: null
@@ -11,28 +13,28 @@ worlds:
     enabled: false
 
 events:
-  player.join:
-    message: player_join
+  # player.join:
+  #   message: player_join
 
-  player.quit:
-    message: player_quit
+  # player.quit:
+  #   message: player_quit
 
-  player.break.block:
-    require-permission: allthewebhooks.track.break
-    message: block_break
-    conditions:
-      player.gamemode:
-        equals: SURVIVAL
+  # player.break.block:
+  #   require-permission: allthewebhooks.track.break
+  #   message: block_break
+  #   conditions:
+  #     player.gamemode:
+  #       equals: SURVIVAL
 
-  player.break.block.*:
-    message: generic_block_break
+  # player.break.block.*:
+  #   message: generic_block_break
 
-  entity.damage.player:
-    message: player_damaged
-    conditions:
-      damage.amount:
-        greater-than: 5
-      damage.cause:
-        not:
-          - FALL
-          - VOID
+  # entity.damage.player:
+  #   message: player_damaged
+  #   conditions:
+  #     damage.amount:
+  #       greater-than: 5
+  #     damage.cause:
+  #       not:
+  #         - FALL
+  #         - VOID

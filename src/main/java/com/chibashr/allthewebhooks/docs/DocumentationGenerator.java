@@ -42,7 +42,6 @@ public class DocumentationGenerator {
         events.sort(Comparator.comparing(EventDefinition::getKey));
 
         writeFile(new File(docsDir, "docs.html"), buildDocsHtml(events));
-        writeFile(new File(docsDir, "events.html"), buildEventsHtml(events));
         writeFile(new File(docsDir, "events.json"), buildEventsJson(events));
         writeFile(new File(docsDir, "README.html"), buildReadmeHtml());
     }
@@ -59,12 +58,6 @@ public class DocumentationGenerator {
         String sidebar = buildDocsSidebar(events, true);
         String content = buildDocsContent(events);
         return buildDocsShell("All the Webhooks - Documentation", sidebar, content);
-    }
-
-    private String buildEventsHtml(List<EventDefinition> events) {
-        String sidebar = buildDocsSidebar(events, false);
-        String content = buildEventsContent(events, false);
-        return buildDocsShell("All the Webhooks - Events", sidebar, content);
     }
 
     private String buildDocsShell(String title, String sidebar, String content) {

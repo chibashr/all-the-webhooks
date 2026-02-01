@@ -78,18 +78,6 @@ class DocumentationGeneratorTest {
     }
 
     @Test
-    void generate_producesEventsHtml() throws IOException {
-        EventRegistry registry = EventRegistry.createDefault();
-        DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);
-        generator.generate();
-        Path eventsHtml = dataFolder.resolve("docs").resolve("events.html");
-        assertTrue(Files.isRegularFile(eventsHtml));
-        String content = Files.readString(eventsHtml);
-        assertTrue(content.contains("<!DOCTYPE html>"));
-        assertTrue(content.contains("Event Reference") || content.contains("events"));
-    }
-
-    @Test
     void generate_producesEventsJson() throws IOException {
         EventRegistry registry = EventRegistry.createDefault();
         DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);

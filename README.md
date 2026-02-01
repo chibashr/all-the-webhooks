@@ -20,7 +20,7 @@ See `planning/testing.md` for test layout and coverage.
    - `events.yaml`
    - `messages.yaml`
 4. Edit the files and run `/allthewebhooks reload`.
-5. Open `plugins/AllTheWebhooks/docs/events.html` to browse supported events.
+5. Open `plugins/AllTheWebhooks/docs/docs.html` to browse supported events.
 
 ## Commands
 

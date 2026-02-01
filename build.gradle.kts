@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.chibashr.allthewebhooks"
-version = "0.1.9"
+version = "0.1.10"
 
 java {
     toolchain {

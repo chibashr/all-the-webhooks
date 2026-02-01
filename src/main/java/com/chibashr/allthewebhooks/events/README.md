@@ -12,6 +12,10 @@ On plugin initialization, **EventDiscovery** scans the classpath for Bukkit/Pape
 
 Built-in definitions (e.g. `player.join`, `server.enable`) and events handled by **EventListener** are skipped so there are no duplicate handlers. Docs are generated from **EventRegistry.getDefinitions()**, so discovered events appear in the generated documentation with their discovered predicates and descriptions.
 
+## Event rule nesting
+
+`events.yaml` supports nested sections, but only leaf sections that contain rule fields (`message`, `webhook`, `enabled`, `require-permission`, `conditions`, `rate-limit`) are registered as rules. This prevents parent grouping nodes (like `events.player`) from matching every `player.*` event when only `events.player.join` is intended.
+
 ### DiscoveredEventBuilder
 
 **DiscoveredEventBuilder** uses manual reflection (no `java.desktop`) to discover getters and format values. Properties named `class` or `handlers` are skipped. Return types are mapped to predicate types; values are formatted for conditions and message placeholders (e.g. Player → name, Block → type and location string).

@@ -117,11 +117,7 @@ public class ConfigManager {
 
         ConfigurationSection eventsSection = yaml.getConfigurationSection("events");
         if (eventsSection != null) {
-            for (String key : eventsSection.getKeys(false)) {
-                ConfigurationSection ruleSection = eventsSection.getConfigurationSection(key);
-                EventRule rule = EventRule.fromSection(ruleSection);
-                eventConfig.putEventRule(key, rule);
-            }
+            collectEventRules(eventsSection, "", eventConfig);
         }
 
         ConfigurationSection worldsSection = yaml.getConfigurationSection("worlds");
@@ -141,6 +137,32 @@ public class ConfigManager {
         }
 
         return eventConfig;
+    }
+
+    private void collectEventRules(ConfigurationSection section, String prefix, EventConfig eventConfig) {
+        for (String key : section.getKeys(false)) {
+            ConfigurationSection ruleSection = section.getConfigurationSection(key);
+            if (ruleSection == null) {
+                continue;
+            }
+            String path = prefix.isEmpty() ? key : prefix + "." + key;
+            if (hasRuleFields(ruleSection)) {
+                EventRule rule = EventRule.fromSection(ruleSection);
+                eventConfig.putEventRule(path, rule);
+            }
+            if (!ruleSection.getKeys(false).isEmpty()) {
+                collectEventRules(ruleSection, path, eventConfig);
+            }
+        }
+    }
+
+    private boolean hasRuleFields(ConfigurationSection section) {
+        return section.contains("enabled")
+                || section.contains("webhook")
+                || section.contains("message")
+                || section.contains("require-permission")
+                || section.contains("conditions")
+                || section.contains("rate-limit");
     }
 
     private void validateEventConfig(

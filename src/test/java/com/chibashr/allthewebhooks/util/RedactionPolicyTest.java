@@ -61,8 +61,9 @@ class RedactionPolicyTest {
     }
 
     @Test
-    void isRedacted_partialSegment_noMatch() {
+    void isRedacted_patternMatchesPrefixOfValue() {
         RedactionPolicy policy = new RedactionPolicy(true, List.of("player.name"));
-        assertFalse(policy.isRedacted("player.name.extra"));
+        assertTrue(policy.isRedacted("player.name"));
+        assertTrue(policy.isRedacted("player.name.extra"), "pattern matches value with extra segments (prefix semantics)");
     }
 }

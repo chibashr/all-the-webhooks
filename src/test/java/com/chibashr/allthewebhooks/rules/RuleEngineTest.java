@@ -47,7 +47,9 @@ class RuleEngineTest {
 
     @Test
     void evaluate_equals_nullContextValue_matchesNullCondition() {
-        Map<String, Object> conditions = Map.of("x", Map.of("equals", null));
+        Map<String, Object> conditionValue = new java.util.HashMap<>();
+        conditionValue.put("equals", null);
+        Map<String, Object> conditions = Map.of("x", conditionValue);
         Map<String, Object> context = Map.of();
         assertTrue(engine.evaluate(conditions, context));
     }

@@ -9,6 +9,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.bukkit.Server;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -20,6 +22,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.world.TimeSkipEvent;
+import org.bukkit.event.world.WorldLoadEvent;
 
 public class EventRegistry {
     private final Map<String, EventDefinition> baseDefinitions;
@@ -289,6 +292,42 @@ public class EventRegistry {
                 }
         ));
 
+        definitions.put("world.load", new EventDefinition(
+                "world.load",
+                "world",
+                "Fired when a world is loaded or created.",
+                Map.of(
+                        "world.name", "string",
+                        "world.seed", "number",
+                        "world.environment", "string",
+                        "world.difficulty", "string",
+                        "world.min_height", "number",
+                        "world.max_height", "number",
+                        "world.hardcore", "boolean",
+                        "world.spawn_location", "string",
+                        "world.structures", "boolean",
+                        "world.folder", "string"
+                ),
+                List.of("world.load.*"),
+                "world.load:\n  message: generic",
+                (WorldLoadEvent event) -> {
+                    World w = event.getWorld();
+                    EventContext context = new EventContext("world.load");
+                    context.setWorld(w);
+                    context.put("world.name", w.getName());
+                    context.put("world.seed", w.getSeed());
+                    context.put("world.environment", w.getEnvironment().name());
+                    context.put("world.difficulty", w.getDifficulty().name());
+                    context.put("world.min_height", w.getMinHeight());
+                    context.put("world.max_height", w.getMaxHeight());
+                    context.put("world.hardcore", w.isHardcore());
+                    context.put("world.spawn_location", LocationFormatter.format(w.getSpawnLocation()));
+                    context.put("world.structures", w.canGenerateStructures());
+                    context.put("world.folder", w.getWorldFolder().getName());
+                    return context;
+                }
+        ));
+
         definitions.put("server.enable", new EventDefinition(
                 "server.enable",
                 "server",
@@ -356,6 +395,112 @@ public class EventRegistry {
 
     public EventDefinition getDefinition(String key) {
         return definitions.get(key);
+    }
+
+    /**
+     * Builds a synthetic event context as the server would produce for the given event key,
+     * using the commanding player (if present) and server state. Use when firing manually
+     * without supplying key=value pairs, e.g. to test emissions.
+     */
+    public EventContext buildSyntheticContext(String eventKey, Player player, Server server) {
+        EventContext ctx = new EventContext(eventKey);
+
+        if (eventKey.equals("server.enable") || eventKey.equals("server.disable")) {
+            ctx.put("server.version", server.getVersion());
+            ctx.put("server.minecraft_version", server.getBukkitVersion());
+            ctx.put("server.name", server.getName());
+            if (eventKey.equals("server.disable")) {
+                ctx.put("server.reason", "manual");
+            }
+            return ctx;
+        }
+
+        World world = player != null ? player.getWorld() : (server.getWorlds().isEmpty() ? null : server.getWorlds().get(0));
+        if (player != null) {
+            ctx.setPlayer(player);
+            ctx.setWorld(player.getWorld());
+            ctx.put("player.name", player.getName());
+            ctx.put("player.uuid", player.getUniqueId().toString());
+            ctx.put("world.name", player.getWorld().getName());
+        } else if (world != null) {
+            ctx.setWorld(world);
+            ctx.put("world.name", world.getName());
+        }
+
+        if (eventKey.equals("player.chat") || eventKey.startsWith("player.chat.")) {
+            ctx.put("chat.message", "(manual test)");
+            return ctx;
+        }
+        if (eventKey.equals("player.command") || eventKey.startsWith("player.command.")) {
+            ctx.put("command.raw", "/allthewebhooks fire " + eventKey);
+            return ctx;
+        }
+        if (eventKey.equals("player.death") || eventKey.startsWith("player.death.")) {
+            ctx.put("death.message", "(manual test)");
+            return ctx;
+        }
+        if (eventKey.equals("player.break.block") || eventKey.startsWith("player.break.block.")) {
+            ctx.put("player.gamemode", player != null ? player.getGameMode().name() : "SURVIVAL");
+            ctx.put("block.type", "STONE");
+            ctx.put("block.location", world != null ? "0,0,0," + world.getName() : "0,0,0");
+            return ctx;
+        }
+        if (eventKey.equals("player.place.block") || eventKey.startsWith("player.place.block.")) {
+            ctx.put("player.gamemode", player != null ? player.getGameMode().name() : "SURVIVAL");
+            ctx.put("block.type", "STONE");
+            ctx.put("block.location", world != null ? "0,0,0," + world.getName() : "0,0,0");
+            return ctx;
+        }
+        if (eventKey.equals("entity.damage.player") || eventKey.startsWith("entity.damage.")) {
+            ctx.put("damage.amount", 0);
+            ctx.put("damage.cause", "CUSTOM");
+            return ctx;
+        }
+        if (eventKey.equals("inventory.open") || eventKey.startsWith("inventory.open.")) {
+            ctx.put("inventory.type", "CHEST");
+            return ctx;
+        }
+        if (eventKey.equals("world.time.change") || eventKey.startsWith("world.time.")) {
+            ctx.put("world.time", world != null ? world.getTime() : 0L);
+            ctx.put("world.skip.reason", "CUSTOM");
+            return ctx;
+        }
+        if (eventKey.equals("world.load") || eventKey.startsWith("world.load.")) {
+            if (world != null) {
+                ctx.put("world.seed", world.getSeed());
+                ctx.put("world.environment", world.getEnvironment().name());
+                ctx.put("world.difficulty", world.getDifficulty().name());
+                ctx.put("world.min_height", world.getMinHeight());
+                ctx.put("world.max_height", world.getMaxHeight());
+                ctx.put("world.hardcore", world.isHardcore());
+                ctx.put("world.spawn_location", LocationFormatter.format(world.getSpawnLocation()));
+                ctx.put("world.structures", world.canGenerateStructures());
+                ctx.put("world.folder", world.getWorldFolder().getName());
+            } else {
+                ctx.put("world.seed", 0L);
+                ctx.put("world.environment", "NORMAL");
+                ctx.put("world.difficulty", "NORMAL");
+                ctx.put("world.min_height", -64);
+                ctx.put("world.max_height", 320);
+                ctx.put("world.hardcore", false);
+                ctx.put("world.spawn_location", "0,0,0");
+                ctx.put("world.structures", true);
+                ctx.put("world.folder", "");
+            }
+            return ctx;
+        }
+
+        if (player != null && (eventKey.equals("player.join") || eventKey.startsWith("player.join.")
+                || eventKey.equals("player.quit") || eventKey.startsWith("player.quit."))) {
+            return ctx;
+        }
+
+        if (player == null && eventKey.startsWith("player.")) {
+            ctx.put("player.name", "Console");
+            ctx.put("player.uuid", "");
+        }
+
+        return ctx;
     }
 
     @SuppressWarnings("unchecked")

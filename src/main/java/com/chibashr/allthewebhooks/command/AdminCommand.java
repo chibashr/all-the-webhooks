@@ -3,12 +3,18 @@ package com.chibashr.allthewebhooks.command;
 import com.chibashr.allthewebhooks.AllTheWebhooksPlugin;
 import com.chibashr.allthewebhooks.config.ConfigManager;
 import com.chibashr.allthewebhooks.config.PluginConfig;
+import com.chibashr.allthewebhooks.events.EventContext;
+import com.chibashr.allthewebhooks.events.EventRegistry;
+import com.chibashr.allthewebhooks.routing.EventRouter;
 import com.chibashr.allthewebhooks.stats.StatsTracker;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.LongAdder;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 
 public class AdminCommand implements CommandExecutor {
     private final AllTheWebhooksPlugin plugin;
@@ -22,13 +28,20 @@ public class AdminCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            sender.sendMessage("Usage: /allthewebhooks <reload|stats|docs generate>");
+            sender.sendMessage("Usage: /allthewebhooks <reload|stats|docs generate|fire <eventKey> [key=value ...] [--dry-run]>");
             return true;
         }
 
         PluginConfig config = configManager.getSnapshot().pluginConfig();
         String sub = args[0].toLowerCase();
         switch (sub) {
+            case "fire" -> {
+                if (!sender.hasPermission(config.firePermission())) {
+                    sender.sendMessage("You do not have permission to fire events.");
+                    return true;
+                }
+                return handleFire(sender, args);
+            }
             case "reload" -> {
                 if (!sender.hasPermission(config.reloadPermission())) {
                     sender.sendMessage("You do not have permission to reload All the Webhooks.");
@@ -60,10 +73,67 @@ public class AdminCommand implements CommandExecutor {
                 return true;
             }
             default -> {
-                sender.sendMessage("Unknown subcommand. Use reload, stats, or docs generate.");
+                sender.sendMessage("Unknown subcommand. Use reload, stats, docs generate, or fire.");
                 return true;
             }
         }
+    }
+
+    private boolean handleFire(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("Usage: /allthewebhooks fire <eventKey> [key=value ...] [--dry-run]");
+            sender.sendMessage("With no key=value: uses server/commanding player data (as the server would fire).");
+            sender.sendMessage("Example: /allthewebhooks fire player.join");
+            sender.sendMessage("Use --dry-run to report what would happen without dispatching.");
+            return true;
+        }
+        String eventKey = args[1];
+        boolean dryRun = false;
+        List<String> pairs = new ArrayList<>();
+        for (int i = 2; i < args.length; i++) {
+            if ("--dry-run".equalsIgnoreCase(args[i])) {
+                dryRun = true;
+            } else {
+                pairs.add(args[i]);
+            }
+        }
+        EventContext context;
+        if (pairs.isEmpty()) {
+            EventRegistry registry = plugin.getEventRegistry();
+            if (registry == null) {
+                sender.sendMessage("[All the Webhooks] Event registry not available.");
+                return true;
+            }
+            context = registry.buildSyntheticContext(
+                    eventKey,
+                    sender instanceof Player ? (Player) sender : null,
+                    plugin.getServer()
+            );
+        } else {
+            context = new EventContext(eventKey);
+            if (sender instanceof Player player) {
+                context.setPlayer(player);
+                context.setWorld(player.getWorld());
+            }
+            for (String pair : pairs) {
+                int eq = pair.indexOf('=');
+                if (eq > 0) {
+                    String key = pair.substring(0, eq).trim();
+                    String value = pair.substring(eq + 1).trim();
+                    if (!key.isEmpty()) {
+                        context.put(key, value);
+                    }
+                }
+            }
+            context.put("event.name", eventKey);
+        }
+        EventRouter router = plugin.getEventRouter();
+        if (router == null) {
+            sender.sendMessage("[All the Webhooks] Router not available.");
+            return true;
+        }
+        router.handleEventWithReport(context, sender::sendMessage, dryRun);
+        return true;
     }
 
     private void sendStats(CommandSender sender, StatsTracker stats) {

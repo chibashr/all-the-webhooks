@@ -102,6 +102,14 @@ public class AllTheWebhooksPlugin extends JavaPlugin {
         return documentationGenerator;
     }
 
+    public EventRouter getEventRouter() {
+        return eventRouter;
+    }
+
+    public EventRegistry getEventRegistry() {
+        return eventRegistry;
+    }
+
     private void registerCommands() {
         PluginCommand command = getCommand("allthewebhooks");
         if (command == null) {

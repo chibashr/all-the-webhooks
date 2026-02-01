@@ -82,6 +82,7 @@ public class ConfigManager {
         builder.statsPermission(yaml.getString("commands.stats.permission", "allthewebhooks.stats"));
         builder.reloadPermission(yaml.getString("commands.reload.permission", "allthewebhooks.reload"));
         builder.docsPermission(yaml.getString("commands.docs.permission", "allthewebhooks.docs"));
+        builder.firePermission(yaml.getString("commands.fire.permission", "allthewebhooks.fire"));
 
         return builder.build();
     }

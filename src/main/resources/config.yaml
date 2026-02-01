@@ -70,3 +70,5 @@ commands:
     permission: allthewebhooks.reload
   docs:
     permission: allthewebhooks.docs
+  fire:
+    permission: allthewebhooks.fire

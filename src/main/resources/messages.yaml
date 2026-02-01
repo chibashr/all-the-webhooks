@@ -27,3 +27,6 @@ messages:
 
   server_disable:
     content: "Server **{server.name}** is shutting down ({server.reason})"
+
+  world_load:
+    content: "World **{world.name}** loaded (seed {world.seed}, {world.environment}, {world.difficulty})"

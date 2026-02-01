@@ -16,6 +16,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.TimeSkipEvent;
+import org.bukkit.event.world.WorldLoadEvent;
 
 public class EventListener implements Listener {
 
@@ -30,7 +31,8 @@ public class EventListener implements Listener {
             PlayerDeathEvent.class,
             EntityDamageEvent.class,
             InventoryOpenEvent.class,
-            TimeSkipEvent.class
+            TimeSkipEvent.class,
+            WorldLoadEvent.class
     );
 
     public static Set<Class<? extends Event>> getHandledEventClasses() {
@@ -92,5 +94,10 @@ public class EventListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onWorldTimeSkip(TimeSkipEvent event) {
         router.handleEvent(registry.buildContext("world.time.change", event));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onWorldLoad(WorldLoadEvent event) {
+        router.handleEvent(registry.buildContext("world.load", event));
     }
 }

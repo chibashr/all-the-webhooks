@@ -27,6 +27,7 @@ public class PluginConfig {
     private final String statsPermission;
     private final String reloadPermission;
     private final String docsPermission;
+    private final String firePermission;
 
     private PluginConfig(Builder builder) {
         this.validateOnStartup = builder.validateOnStartup;
@@ -50,6 +51,7 @@ public class PluginConfig {
         this.statsPermission = builder.statsPermission;
         this.reloadPermission = builder.reloadPermission;
         this.docsPermission = builder.docsPermission;
+        this.firePermission = builder.firePermission;
     }
 
     public static Builder builder() {
@@ -148,6 +150,10 @@ public class PluginConfig {
         return docsPermission;
     }
 
+    public String firePermission() {
+        return firePermission;
+    }
+
     public static class Builder {
         private boolean validateOnStartup = true;
         private boolean validateOnReload = true;
@@ -170,6 +176,7 @@ public class PluginConfig {
         private String statsPermission = "allthewebhooks.stats";
         private String reloadPermission = "allthewebhooks.reload";
         private String docsPermission = "allthewebhooks.docs";
+        private String firePermission = "allthewebhooks.fire";
 
         public Builder validateOnStartup(boolean value) {
             this.validateOnStartup = value;
@@ -275,6 +282,11 @@ public class PluginConfig {
 
         public Builder docsPermission(String value) {
             this.docsPermission = value == null ? "allthewebhooks.docs" : value;
+            return this;
+        }
+
+        public Builder firePermission(String value) {
+            this.firePermission = value == null ? "allthewebhooks.fire" : value;
             return this;
         }
 

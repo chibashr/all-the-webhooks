@@ -1,0 +1,20 @@
+name: AllTheWebhooks
+version: ${version}
+main: com.chibashr.allthewebhooks.AllTheWebhooksPlugin
+api-version: "1.20"
+author: chibashr
+description: Opt-in in-game event webhooks for Paper and Folia.
+commands:
+  allthewebhooks:
+    description: All the Webhooks admin commands.
+    usage: /allthewebhooks <reload|stats|docs generate>
+    permission: allthewebhooks.use
+permissions:
+  allthewebhooks.use:
+    default: true
+  allthewebhooks.stats:
+    default: op
+  allthewebhooks.reload:
+    default: op
+  allthewebhooks.docs:
+    default: op

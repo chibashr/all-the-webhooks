@@ -1,0 +1,38 @@
+# All the Webhooks — Event Rules
+
+defaults:
+  enabled: true
+  webhook: default
+  message: generic
+  require-permission: null
+
+worlds:
+  world_nether:
+    enabled: false
+
+events:
+  player.join:
+    message: player_join
+
+  player.quit:
+    message: player_quit
+
+  player.break.block:
+    require-permission: allthewebhooks.track.break
+    message: block_break
+    conditions:
+      player.gamemode:
+        equals: SURVIVAL
+
+  player.break.block.*:
+    message: generic_block_break
+
+  entity.damage.player:
+    message: player_damaged
+    conditions:
+      damage.amount:
+        greater-than: 5
+      damage.cause:
+        not:
+          - FALL
+          - VOID

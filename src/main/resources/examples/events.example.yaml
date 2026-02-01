@@ -1,0 +1,18 @@
+# All the Webhooks — Example Event Rules
+
+defaults:
+  enabled: true
+  webhook: default
+  message: generic
+  require-permission: null
+
+events:
+  player.join:
+    message: player_join
+
+  player.break.block.diamond_ore:
+    webhook: moderation
+    message: diamond_mined
+
+  player.break.block.*:
+    message: generic_block_break

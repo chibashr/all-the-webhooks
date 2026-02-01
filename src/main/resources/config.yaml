@@ -1,0 +1,72 @@
+# All the Webhooks — Main Configuration
+
+plugin:
+  validate-on-startup: true
+  validate-on-reload: true
+  warn-on-unresolved-events: true
+
+# ----------------------------------------
+# Webhook Definitions
+# ----------------------------------------
+webhooks:
+  default:
+    url: "https://discord.com/api/webhooks/PROJECT1"
+    timeout-ms: 5000
+
+  moderation:
+    url: "https://discord.com/api/webhooks/PROJECT2"
+    timeout-ms: 5000
+
+# ----------------------------------------
+# Rate Limiting
+# ----------------------------------------
+rate-limit:
+  enabled: true
+  events-per-second: 100
+  overflow-behavior: drop   # drop | disable-event
+  warn-threshold-percent: 80
+
+# ----------------------------------------
+# Threading / Safety
+# ----------------------------------------
+execution:
+  dispatch-async: true
+  folia-compatible: true
+
+# ----------------------------------------
+# Redaction Rules
+# ----------------------------------------
+redaction:
+  enabled: true
+  fields:
+    - player.ip
+    - command.raw
+    - chat.raw
+    - nbt.*
+
+# ----------------------------------------
+# Logging & Observability
+# ----------------------------------------
+logging:
+  console-alerts: true
+  log-invalid-events: true
+  log-webhook-failures: true
+  debug: false
+
+# ----------------------------------------
+# Documentation Generation
+# ----------------------------------------
+documentation:
+  generate-on-startup: true
+  generate-on-reload: false
+
+# ----------------------------------------
+# Commands & Permissions
+# ----------------------------------------
+commands:
+  stats:
+    permission: allthewebhooks.stats
+  reload:
+    permission: allthewebhooks.reload
+  docs:
+    permission: allthewebhooks.docs

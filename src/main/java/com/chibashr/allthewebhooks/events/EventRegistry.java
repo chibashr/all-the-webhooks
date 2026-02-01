@@ -4,9 +4,11 @@ import com.chibashr.allthewebhooks.config.EventConfig;
 import com.chibashr.allthewebhooks.config.EventKeyMatcher;
 import com.chibashr.allthewebhooks.util.LocationFormatter;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -287,6 +289,35 @@ public class EventRegistry {
                 }
         ));
 
+        definitions.put("server.enable", new EventDefinition(
+                "server.enable",
+                "server",
+                "Fired when the server has finished starting (plugin enabled).",
+                Map.of(
+                        "server.version", "string",
+                        "server.minecraft_version", "string",
+                        "server.name", "string"
+                ),
+                List.of("server.enable.*"),
+                "server.enable:\n  message: server_enable",
+                null
+        ));
+
+        definitions.put("server.disable", new EventDefinition(
+                "server.disable",
+                "server",
+                "Fired when the server is shutting down (plugin disabling).",
+                Map.of(
+                        "server.version", "string",
+                        "server.minecraft_version", "string",
+                        "server.name", "string",
+                        "server.reason", "string"
+                ),
+                List.of("server.disable.*"),
+                "server.disable:\n  message: server_disable",
+                null
+        ));
+
         return new EventRegistry(definitions);
     }
 
@@ -304,6 +335,19 @@ public class EventRegistry {
                 }
             }
         }
+    }
+
+    public Set<String> getBaseDefinitionKeys() {
+        return Collections.unmodifiableSet(baseDefinitions.keySet());
+    }
+
+    public void addDiscoveredDefinition(EventDefinition definition) {
+        if (definition == null) {
+            return;
+        }
+        String key = definition.getKey();
+        baseDefinitions.put(key, definition);
+        definitions.put(key, definition);
     }
 
     public Collection<EventDefinition> getDefinitions() {

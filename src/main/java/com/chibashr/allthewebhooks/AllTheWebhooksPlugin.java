@@ -3,6 +3,8 @@ package com.chibashr.allthewebhooks;
 import com.chibashr.allthewebhooks.command.AdminCommand;
 import com.chibashr.allthewebhooks.config.ConfigManager;
 import com.chibashr.allthewebhooks.docs.DocumentationGenerator;
+import com.chibashr.allthewebhooks.events.EventContext;
+import com.chibashr.allthewebhooks.events.EventDiscovery;
 import com.chibashr.allthewebhooks.events.EventListener;
 import com.chibashr.allthewebhooks.events.EventRegistry;
 import com.chibashr.allthewebhooks.routing.EventRouter;
@@ -10,7 +12,12 @@ import com.chibashr.allthewebhooks.stats.StatsTracker;
 import com.chibashr.allthewebhooks.util.WarningTracker;
 import com.chibashr.allthewebhooks.webhook.WebhookDispatcher;
 import java.io.File;
+import java.util.List;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.event.Event;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class AllTheWebhooksPlugin extends JavaPlugin {
@@ -29,6 +36,14 @@ public class AllTheWebhooksPlugin extends JavaPlugin {
         warningTracker = new WarningTracker(getLogger());
         statsTracker = new StatsTracker();
         eventRegistry = EventRegistry.createDefault();
+        List<EventDiscovery.DiscoveredEvent> discovered = EventDiscovery.discover(
+                getClass().getClassLoader(),
+                eventRegistry.getBaseDefinitionKeys(),
+                EventListener.getHandledEventClasses()
+        );
+        for (EventDiscovery.DiscoveredEvent d : discovered) {
+            eventRegistry.addDiscoveredDefinition(d.definition());
+        }
         configManager = new ConfigManager(this, warningTracker, eventRegistry);
         configManager.reloadAll(true);
         eventRegistry.updateFromConfig(configManager.getSnapshot().eventConfig());
@@ -37,13 +52,36 @@ public class AllTheWebhooksPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new EventListener(eventRegistry, eventRouter), this);
 
+        Listener discoveredListener = new Listener() {};
+        PluginManager pm = getServer().getPluginManager();
+        for (EventDiscovery.DiscoveredEvent d : discovered) {
+            pm.registerEvent(
+                    d.eventClass(),
+                    discoveredListener,
+                    EventPriority.MONITOR,
+                    (listener, event) -> {
+                        EventContext ctx = eventRegistry.buildContext(d.key(), (Event) event);
+                        if (ctx != null) {
+                            eventRouter.handleEvent(ctx);
+                        }
+                    },
+                    this
+            );
+        }
+
         documentationGenerator = new DocumentationGenerator(this, eventRegistry);
         if (configManager.getSnapshot().pluginConfig().documentationGenerateOnStartup()) {
             documentationGenerator.generateAsync();
         }
 
         registerCommands();
+        fireServerEnable();
         getLogger().info("All the Webhooks enabled.");
+    }
+
+    @Override
+    public void onDisable() {
+        fireServerDisable();
     }
 
     public void reloadAllTheWebhooks() {
@@ -90,5 +128,22 @@ public class AllTheWebhooksPlugin extends JavaPlugin {
             parent.mkdirs();
         }
         saveResource(path, false);
+    }
+
+    private void fireServerEnable() {
+        EventContext context = new EventContext("server.enable");
+        context.put("server.version", getServer().getVersion());
+        context.put("server.minecraft_version", getServer().getBukkitVersion());
+        context.put("server.name", getServer().getName());
+        eventRouter.handleEvent(context);
+    }
+
+    private void fireServerDisable() {
+        EventContext context = new EventContext("server.disable");
+        context.put("server.version", getServer().getVersion());
+        context.put("server.minecraft_version", getServer().getBukkitVersion());
+        context.put("server.name", getServer().getName());
+        context.put("server.reason", "shutdown");
+        eventRouter.handleEvent(context);
     }
 }

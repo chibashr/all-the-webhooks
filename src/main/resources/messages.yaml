@@ -21,3 +21,9 @@ messages:
 
   diamond_mined:
     content: "Diamond Ore mined by {player.name} at {block.location} in {world.name}"
+
+  server_enable:
+    content: "Server **{server.name}** is up (version {server.minecraft_version})"
+
+  server_disable:
+    content: "Server **{server.name}** is shutting down ({server.reason})"

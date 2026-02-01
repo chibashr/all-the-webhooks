@@ -7,6 +7,12 @@ defaults:
   require-permission: null
 
 events:
+  server.enable:
+    message: server_enable
+
+  server.disable:
+    message: server_disable
+
   player.join:
     message: player_join
 

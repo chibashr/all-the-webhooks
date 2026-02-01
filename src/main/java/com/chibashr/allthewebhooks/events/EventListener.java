@@ -1,6 +1,8 @@
 package com.chibashr.allthewebhooks.events;
 
 import com.chibashr.allthewebhooks.routing.EventRouter;
+import java.util.Set;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -16,6 +18,24 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.TimeSkipEvent;
 
 public class EventListener implements Listener {
+
+    /** Event classes handled by this listener; discovery skips these to avoid duplicate handlers. */
+    private static final Set<Class<? extends Event>> HANDLED_EVENT_CLASSES = Set.of(
+            PlayerJoinEvent.class,
+            PlayerQuitEvent.class,
+            AsyncPlayerChatEvent.class,
+            PlayerCommandPreprocessEvent.class,
+            BlockBreakEvent.class,
+            BlockPlaceEvent.class,
+            PlayerDeathEvent.class,
+            EntityDamageEvent.class,
+            InventoryOpenEvent.class,
+            TimeSkipEvent.class
+    );
+
+    public static Set<Class<? extends Event>> getHandledEventClasses() {
+        return HANDLED_EVENT_CLASSES;
+    }
     private final EventRegistry registry;
     private final EventRouter router;
 

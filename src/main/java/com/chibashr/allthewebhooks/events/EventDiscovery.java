@@ -11,21 +11,18 @@ import org.reflections.util.ConfigurationBuilder;
 
 /**
  * Discovers Bukkit/Paper event classes on the classpath and produces event keys and
- * minimal definitions so the plugin can offer webhooks for all events.
+ * definitions with predicates and context derived from each event class's public getters.
+ * Uses reflection (no java.desktop) to discover getX/isX methods and expose them as
+ * predicates and context values.
  */
 public final class EventDiscovery {
-
-    private static final Map<String, String> DISCOVERED_PREDICATES = Map.of(
-            "event.name", "string",
-            "event.class", "string"
-    );
 
     private EventDiscovery() {
     }
 
     /**
      * Result of discovering one event type: the event class, its dot-notation key,
-     * and a minimal EventDefinition with a generic context builder.
+     * and an EventDefinition with predicates and context derived from the event's getters.
      */
     public record DiscoveredEvent(
             Class<? extends Event> eventClass,
@@ -76,25 +73,54 @@ public final class EventDiscovery {
                 continue;
             }
             String category = key.contains(".") ? key.substring(0, key.indexOf('.')) : "event";
+            Map<String, String> predicates = DiscoveredEventBuilder.buildPredicates(eventClass);
+            String description = humanizeEventDescription(eventClass);
             EventDefinition definition = new EventDefinition(
                     key,
                     category,
-                    "Discovered Bukkit/Paper event.",
-                    DISCOVERED_PREDICATES,
+                    description,
+                    predicates,
                     List.of(key + ".*"),
                     key + ":\n  message: generic",
-                    (Event e) -> {
-                        EventContext ctx = new EventContext(key);
-                        ctx.put("event.name", key);
-                        ctx.put("event.class", e.getClass().getSimpleName());
-                        return ctx;
-                    }
+                    DiscoveredEventBuilder.buildContextBuilder(eventClass, key)
             );
             result.add(new DiscoveredEvent(eventClass, key, definition));
             addedKeys.add(key);
         }
 
         return result;
+    }
+
+    /**
+     * Builds a short human-readable description from an event class name.
+     * E.g. PlayerJoinEvent -> "Fired when a player joins.", BlockBreakEvent -> "Fired when a block breaks."
+     */
+    static String humanizeEventDescription(Class<? extends Event> eventClass) {
+        String simple = eventClass.getSimpleName();
+        if (simple.endsWith("Event")) {
+            simple = simple.substring(0, simple.length() - 5);
+        }
+        if (simple.isEmpty()) {
+            return "Bukkit/Paper event.";
+        }
+        String phrase = camelToPhrase(simple);
+        return "Fired when " + phrase + ".";
+    }
+
+    private static String camelToPhrase(String camel) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < camel.length(); i++) {
+            char c = camel.charAt(i);
+            if (Character.isUpperCase(c) && sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(Character.toLowerCase(c));
+        }
+        String words = sb.toString().trim();
+        if (words.isEmpty()) {
+            return "this event occurs";
+        }
+        return words;
     }
 
     /**

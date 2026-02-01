@@ -1,0 +1,51 @@
+# Manually run to set a new version, push it, and publish a GitHub Release.
+# The Release workflow runs on the new tag and builds/attaches the JAR.
+#
+# Usage: Actions → Version and Release → Run workflow → enter version (e.g. 0.1.0)
+
+name: Version and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  version-and-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize version
+        id: ver
+        run: |
+          v="${{ inputs.version }}"
+          v="${v#v}"
+          echo "version=${v}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${v}" >> "$GITHUB_OUTPUT"
+
+      - name: Update version in build.gradle.kts
+        run: |
+          sed -i 's/^version = ".*"/version = "${{ steps.ver.outputs.version }}"/' build.gradle.kts
+
+      - name: Commit and push version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add build.gradle.kts
+          git diff --staged --quiet || git commit -m "Release ${{ steps.ver.outputs.tag }}"
+          git push origin HEAD
+
+      - name: Create and push tag
+        run: |
+          git tag "${{ steps.ver.outputs.tag }}"
+          git push origin "${{ steps.ver.outputs.tag }}"

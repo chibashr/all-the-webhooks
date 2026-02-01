@@ -2,8 +2,7 @@
 #
 # Usage: Actions → Version and Release → Run workflow → enter version (e.g. 0.1.0)
 #
-# Job runs on the host (no job-level container) so git and checkout use the correct workspace.
-# Gradle build runs in Docker with workspace mounted so JAR is produced in the repo.
+# Job runs on the host. Gradle wrapper is generated once; build runs on host so Paper API resolves.
 
 name: Version and Release
 
@@ -52,6 +51,21 @@ jobs:
           git tag "${{ steps.ver.outputs.tag }}"
           git push origin "${{ steps.ver.outputs.tag }}"
 
+      - name: Generate Gradle wrapper
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            -w "$GITHUB_WORKSPACE" \
+            -u root \
+            gradle:8.5-jdk21 \
+            gradle wrapper --gradle-version 8.5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
@@ -60,15 +74,7 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: Build JAR
-        run: |
-          docker run --rm \
-            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
-            -v "$HOME/.gradle:/root/.gradle" \
-            -w "$GITHUB_WORKSPACE" \
-            -u root \
-            -e GRADLE_USER_HOME=/root/.gradle \
-            gradle:8.5-jdk21 \
-            gradle build --no-daemon
+        run: ./gradlew build --no-daemon
 
       - name: Create Release and upload JAR
         uses: softprops/action-gh-release@v2

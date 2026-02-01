@@ -58,7 +58,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
             -w "$GITHUB_WORKSPACE" \
             -u root \
-            gradle:8.5-jdk17 \
+            gradle:8.5-jdk21 \
             gradle build --no-daemon
 
       - name: Create Release and upload JAR

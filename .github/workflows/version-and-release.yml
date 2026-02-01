@@ -29,6 +29,7 @@ jobs:
 
       - name: Normalize version
         id: ver
+        working-directory: ${{ github.workspace }}
         run: |
           v="${{ inputs.version }}"
           v="${v#v}"
@@ -36,10 +37,12 @@ jobs:
           echo "tag=v${v}" >> "$GITHUB_OUTPUT"
 
       - name: Update version in build.gradle.kts
+        working-directory: ${{ github.workspace }}
         run: |
           sed -i 's/^version = ".*"/version = "${{ steps.ver.outputs.version }}"/' build.gradle.kts
 
       - name: Commit and push version
+        working-directory: ${{ github.workspace }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -48,11 +51,13 @@ jobs:
           git push origin HEAD
 
       - name: Create and push tag
+        working-directory: ${{ github.workspace }}
         run: |
           git tag "${{ steps.ver.outputs.tag }}"
           git push origin "${{ steps.ver.outputs.tag }}"
 
       - name: Build JAR
+        working-directory: ${{ github.workspace }}
         run: gradle build --no-daemon
 
       - name: Create Release and upload JAR

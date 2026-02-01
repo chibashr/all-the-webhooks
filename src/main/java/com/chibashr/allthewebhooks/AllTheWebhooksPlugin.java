@@ -139,6 +139,9 @@ public class AllTheWebhooksPlugin extends JavaPlugin {
     }
 
     private void fireServerDisable() {
+        if (eventRouter == null) {
+            return;
+        }
         EventContext context = new EventContext("server.disable");
         context.put("server.version", getServer().getVersion());
         context.put("server.minecraft_version", getServer().getBukkitVersion());

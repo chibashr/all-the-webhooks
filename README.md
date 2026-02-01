@@ -7,7 +7,7 @@ configured in-game events to one or more webhooks using YAML-driven rules.
 
 - Build (includes tests): `./gradlew build`
 - Run tests only: `./gradlew test`
-- Output JAR: `build/libs/`
+- Output JAR: `build/libs/` (fat JAR via Shadow; includes runtime deps such as Reflections)
 
 See `planning/testing.md` for test layout and coverage.
 

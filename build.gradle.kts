@@ -1,5 +1,6 @@
 plugins {
     java
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 group = "com.chibashr.allthewebhooks"
@@ -33,4 +34,16 @@ tasks.processResources {
     filesMatching("plugin.yml") {
         expand("version" to project.version)
     }
+}
+
+tasks.named<Jar>("jar") {
+    enabled = false
+}
+
+tasks.named("shadowJar") {
+    (this as org.gradle.api.tasks.bundling.Jar).archiveClassifier.set("")
+}
+
+tasks.named("build") {
+    dependsOn(tasks.named("shadowJar"))
 }

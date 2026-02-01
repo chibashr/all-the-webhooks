@@ -1,6 +1,9 @@
 # Manually run to set a new version, push it, tag it, build the JAR, and publish a GitHub Release.
 #
 # Usage: Actions → Version and Release → Run workflow → enter version (e.g. 0.1.0)
+#
+# Container jobs: use GITHUB_WORKSPACE (container path) not github.workspace (host path).
+# See: https://github.com/actions/runner/issues/2058
 
 name: Version and Release
 
@@ -21,9 +24,6 @@ jobs:
     container:
       image: gradle:8.5-jdk17
       options: --user root
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,10 +40,12 @@ jobs:
 
       - name: Update version in build.gradle.kts
         run: |
+          cd "${GITHUB_WORKSPACE:?}"
           sed -i 's/^version = ".*"/version = "${{ steps.ver.outputs.version }}"/' build.gradle.kts
 
       - name: Commit and push version
         run: |
+          cd "${GITHUB_WORKSPACE:?}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add build.gradle.kts
@@ -52,11 +54,14 @@ jobs:
 
       - name: Create and push tag
         run: |
+          cd "${GITHUB_WORKSPACE:?}"
           git tag "${{ steps.ver.outputs.tag }}"
           git push origin "${{ steps.ver.outputs.tag }}"
 
       - name: Build JAR
-        run: gradle build --no-daemon
+        run: |
+          cd "${GITHUB_WORKSPACE:?}"
+          gradle build --no-daemon
 
       - name: Create Release and upload JAR
         uses: softprops/action-gh-release@v2

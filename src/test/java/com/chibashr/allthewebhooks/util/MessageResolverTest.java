@@ -9,6 +9,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -108,5 +110,85 @@ class MessageResolverTest {
                 PluginConfig.builder().build()
         );
         assertEquals("Player [REDACTED] did something", result);
+    }
+
+    @Test
+    void resolve_regexTransform_extractsWorldFolderName() {
+        // Extract second-to-last path segment (e.g. "hardcore-26" from "2026/02/hardcore-26/world")
+        String result = MessageResolver.resolve(
+                "**{world.name|regex:.*/([^/]+)/[^/]+$:$1}** has been loaded",
+                Map.of("world.name", "2026/02/hardcore-26/world"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("**hardcore-26** has been loaded", result);
+    }
+
+    @Test
+    void resolve_placeholderWithoutPipe_unchangedBehavior() {
+        String result = MessageResolver.resolve(
+                "Hello {player.name}",
+                Map.of("player.name", "Steve"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("Hello Steve", result);
+    }
+
+    @Test
+    void resolve_redactedWithRegexTransform_redactedNotTransformed() {
+        RedactionPolicy policy = new RedactionPolicy(true, java.util.List.of("world.name"));
+        String result = MessageResolver.resolve(
+                "World {world.name|regex:.*/([^/]+)/[^/]+$:$1}",
+                Map.of("world.name", "2026/02/hardcore-26/world"),
+                policy,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("World [REDACTED]", result);
+    }
+
+    @Test
+    void resolve_missingPlaceholderWithRegex_emptyString() {
+        String result = MessageResolver.resolve(
+                "X{missing|regex:.*:y}Z",
+                Map.of(),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("XZ", result);
+    }
+
+    @Test
+    void resolve_invalidRegex_fallbackToUntransformedValue() {
+        String result = MessageResolver.resolve(
+                "Val: {key|regex:[invalid:}",
+                Map.of("key", "hello"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("Val: hello", result);
+    }
+
+    @Test
+    void parseRegexSpec_escapedColon_preservedInPatternAndReplacement() {
+        MessageResolver.RegexSpec spec = MessageResolver.parseRegexSpec("regex:foo\\:bar:baz\\:qux");
+        assertNotNull(spec);
+        assertEquals("foo:bar", spec.pattern);
+        assertEquals("baz:qux", spec.replacement);
+    }
+
+    @Test
+    void parseRegexSpec_noColon_returnsNull() {
+        assertNull(MessageResolver.parseRegexSpec("regex:noColonHere"));
+    }
+
+    @Test
+    void parseRegexSpec_notRegexPrefix_returnsNull() {
+        assertNull(MessageResolver.parseRegexSpec("other:foo:bar"));
     }
 }

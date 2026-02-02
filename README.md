@@ -75,5 +75,5 @@ Docs are **offline-first**: no hosted site or internet required. Open `docs.html
 Vibe-coded with love <3
 
 - **Author:** chibashr  
-- **License:** See repository  
+- **License:** MIT — see [LICENSE](LICENSE)  
 - **Tests:** `./gradlew test` — see `planning/testing.md` for layout and coverage.

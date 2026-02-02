@@ -516,6 +516,48 @@ public class EventRegistry {
         return builder.build(event);
     }
 
+    /**
+     * Builds a world.load event context from an already-loaded World.
+     * Use at plugin startup to emit world.load for worlds that were loaded before the plugin enabled
+     * (and thus did not fire WorldLoadEvent for this plugin).
+     */
+    public EventContext buildContextForWorldLoad(World world) {
+        if (world == null) {
+            return null;
+        }
+        EventContext context = new EventContext("world.load");
+        context.setWorld(world);
+        context.put("world.name", world.getName());
+        context.put("world.seed", world.getSeed());
+        context.put("world.environment", world.getEnvironment().name());
+        context.put("world.difficulty", world.getDifficulty().name());
+        context.put("world.min_height", world.getMinHeight());
+        context.put("world.max_height", world.getMaxHeight());
+        context.put("world.hardcore", world.isHardcore());
+        context.put("world.spawn_location", LocationFormatter.format(world.getSpawnLocation()));
+        context.put("world.structures", world.canGenerateStructures());
+        context.put("world.folder", world.getWorldFolder().getName());
+        return context;
+    }
+
+    /**
+     * Builds a player.join event context from a Player already online.
+     * Use at plugin startup to emit player.join for players who were already on the server when the
+     * plugin enabled (and thus did not fire PlayerJoinEvent for this plugin).
+     */
+    public EventContext buildContextForPlayerJoin(Player player) {
+        if (player == null || !player.isOnline()) {
+            return null;
+        }
+        EventContext context = new EventContext("player.join");
+        context.setPlayer(player);
+        context.setWorld(player.getWorld());
+        context.put("player.name", player.getName());
+        context.put("player.uuid", player.getUniqueId().toString());
+        context.put("world.name", player.getWorld().getName());
+        return context;
+    }
+
     private EventDefinition deriveDefinition(String key) {
         EventDefinition base = findBestBaseDefinition(key);
         if (base == null) {

@@ -13,7 +13,9 @@ import com.chibashr.allthewebhooks.util.WarningTracker;
 import com.chibashr.allthewebhooks.webhook.WebhookDispatcher;
 import java.io.File;
 import java.util.List;
+import org.bukkit.World;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -76,6 +78,7 @@ public class AllTheWebhooksPlugin extends JavaPlugin {
 
         registerCommands();
         fireServerEnable();
+        fireCatchUpEvents();
         getLogger().info("All the Webhooks enabled.");
     }
 
@@ -144,6 +147,31 @@ public class AllTheWebhooksPlugin extends JavaPlugin {
         context.put("server.minecraft_version", getServer().getBukkitVersion());
         context.put("server.name", getServer().getName());
         eventRouter.handleEvent(context);
+    }
+
+    /**
+     * Emits events for state that already existed when the plugin enabled, so nothing is missed
+     * because the plugin loads after the world (and after some players have already joined).
+     * <ul>
+     *   <li>world.load — for each world in server.getWorlds() (WorldLoadEvent does not fire for
+     *       worlds loaded before the plugin).</li>
+     *   <li>player.join — for each player in server.getOnlinePlayers() (PlayerJoinEvent did not
+     *       fire for this plugin for players already online).</li>
+     * </ul>
+     */
+    private void fireCatchUpEvents() {
+        for (World world : getServer().getWorlds()) {
+            EventContext context = eventRegistry.buildContextForWorldLoad(world);
+            if (context != null) {
+                eventRouter.handleEvent(context);
+            }
+        }
+        for (Player player : getServer().getOnlinePlayers()) {
+            EventContext context = eventRegistry.buildContextForPlayerJoin(player);
+            if (context != null) {
+                eventRouter.handleEvent(context);
+            }
+        }
     }
 
     private void fireServerDisable() {

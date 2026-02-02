@@ -3,6 +3,8 @@ package com.chibashr.allthewebhooks.config;
 import com.chibashr.allthewebhooks.events.EventRegistry;
 import com.chibashr.allthewebhooks.util.WarningTracker;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -38,10 +40,68 @@ public class ConfigManager {
         return snapshot;
     }
 
-    private PluginConfig loadPluginConfig() {
-        File file = new File(plugin.getDataFolder(), "config.yaml");
-        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+    /**
+     * Validates config.yaml, messages.yaml, and events.yaml without updating the live snapshot.
+     * Returns a list of validation messages (errors and warnings). Empty list means no issues found.
+     */
+    public List<String> runValidation() {
+        List<String> messages = new ArrayList<>();
+        File dataFolder = plugin.getDataFolder();
 
+        File configFile = new File(dataFolder, "config.yaml");
+        if (!configFile.exists()) {
+            messages.add("config.yaml: file not found");
+            return messages;
+        }
+        PluginConfig pluginConfig;
+        try {
+            pluginConfig = loadPluginConfigFromFile(configFile);
+        } catch (Exception e) {
+            messages.add("config.yaml: " + e.getMessage());
+            return messages;
+        }
+        if (pluginConfig.getWebhook("default") == null
+                || pluginConfig.getWebhook("default").url() == null
+                || pluginConfig.getWebhook("default").url().isEmpty()) {
+            messages.add("config.yaml: default webhook is missing or has no URL");
+        }
+
+        File messagesFile = new File(dataFolder, "messages.yaml");
+        if (!messagesFile.exists()) {
+            messages.add("messages.yaml: file not found");
+            return messages;
+        }
+        MessageConfig messageConfig;
+        try {
+            messageConfig = loadMessageConfigFromFile(messagesFile);
+        } catch (Exception e) {
+            messages.add("messages.yaml: " + e.getMessage());
+            return messages;
+        }
+
+        File eventsFile = new File(dataFolder, "events.yaml");
+        if (!eventsFile.exists()) {
+            messages.add("events.yaml: file not found");
+            return messages;
+        }
+        EventConfig eventConfig;
+        try {
+            eventConfig = loadEventConfigFromFile(eventsFile, pluginConfig, messageConfig);
+        } catch (Exception e) {
+            messages.add("events.yaml: " + e.getMessage());
+            return messages;
+        }
+
+        validateEventConfigTo(pluginConfig, messageConfig, eventConfig, registry, messages);
+        return messages;
+    }
+
+    private PluginConfig loadPluginConfigFromFile(File file) {
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        return buildPluginConfigFromYaml(yaml);
+    }
+
+    private PluginConfig buildPluginConfigFromYaml(YamlConfiguration yaml) {
         PluginConfig.Builder builder = PluginConfig.builder();
         builder.validateOnStartup(yaml.getBoolean("plugin.validate-on-startup", true));
         builder.validateOnReload(yaml.getBoolean("plugin.validate-on-reload", true));
@@ -83,8 +143,106 @@ public class ConfigManager {
         builder.reloadPermission(yaml.getString("commands.reload.permission", "allthewebhooks.reload"));
         builder.docsPermission(yaml.getString("commands.docs.permission", "allthewebhooks.docs"));
         builder.firePermission(yaml.getString("commands.fire.permission", "allthewebhooks.fire"));
+        builder.validatePermission(yaml.getString("commands.validate.permission", "allthewebhooks.validate"));
 
         return builder.build();
+    }
+
+    private MessageConfig loadMessageConfigFromFile(File file) {
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        MessageConfig messageConfig = new MessageConfig();
+        ConfigurationSection messages = yaml.getConfigurationSection("messages");
+        if (messages != null) {
+            for (String key : messages.getKeys(false)) {
+                ConfigurationSection section = messages.getConfigurationSection(key);
+                if (section == null) {
+                    continue;
+                }
+                messageConfig.put(key, section.getString("content", ""));
+            }
+        }
+        return messageConfig;
+    }
+
+    private EventConfig loadEventConfigFromFile(File file, PluginConfig pluginConfig, MessageConfig messageConfig) {
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        EventRuleDefaults defaults = EventRuleDefaults.fromSection(yaml.getConfigurationSection("defaults"));
+        EventConfig eventConfig = new EventConfig(defaults);
+
+        ConfigurationSection eventsSection = yaml.getConfigurationSection("events");
+        if (eventsSection != null) {
+            collectEventRules(eventsSection, "", eventConfig);
+        }
+
+        ConfigurationSection worldsSection = yaml.getConfigurationSection("worlds");
+        if (worldsSection != null) {
+            for (String worldName : worldsSection.getKeys(false)) {
+                ConfigurationSection worldSection = worldsSection.getConfigurationSection(worldName);
+                if (worldSection == null) {
+                    continue;
+                }
+                WorldEventConfig worldConfig = WorldEventConfig.fromSection(worldSection);
+                eventConfig.putWorldConfig(worldName, worldConfig);
+            }
+        }
+
+        return eventConfig;
+    }
+
+    private void validateEventConfigTo(
+            PluginConfig pluginConfig,
+            MessageConfig messageConfig,
+            EventConfig eventConfig,
+            EventRegistry registry,
+            List<String> validationOutput
+    ) {
+        if (!pluginConfig.shouldValidate()) {
+            return;
+        }
+        for (String key : eventConfig.getAllConfiguredKeys()) {
+            boolean matches = registry.getDefinitions().stream()
+                    .anyMatch(definition -> EventKeyMatcher.matches(key, definition.getKey()));
+            if (!matches && pluginConfig.warnOnUnresolvedEvents() && pluginConfig.isLogInvalidEvents()) {
+                String msg = "events.yaml: configured key does not match any supported event: " + key;
+                if (validationOutput != null) {
+                    validationOutput.add(msg);
+                } else {
+                    warningTracker.warnOnce("invalid-event:" + key, "Configured event key does not match any supported event: " + key);
+                }
+            }
+        }
+        for (Map.Entry<String, EventRule> entry : eventConfig.getEventRules().entrySet()) {
+            String key = entry.getKey();
+            EventRule rule = entry.getValue();
+            String messageId = rule.getMessage();
+            if (messageId != null && !messageId.isEmpty() && !messageConfig.hasMessage(messageId)) {
+                String msg = "events.yaml: " + key + " references missing message id: " + messageId;
+                if (validationOutput != null) {
+                    validationOutput.add(msg);
+                } else {
+                    warningTracker.warnOnce("missing-message:" + key, "Event " + key + " references missing message id: " + messageId);
+                }
+            }
+        }
+        for (Map.Entry<String, WorldEventConfig> entry : eventConfig.getWorldConfigs().entrySet()) {
+            String worldName = entry.getKey();
+            for (Map.Entry<String, EventRule> ruleEntry : entry.getValue().getEventRules().entrySet()) {
+                String key = ruleEntry.getKey();
+                String messageId = ruleEntry.getValue().getMessage();
+                if (messageId != null && !messageId.isEmpty() && !messageConfig.hasMessage(messageId)) {
+                    String msg = "events.yaml: world " + worldName + " event " + key + " references missing message id: " + messageId;
+                    if (validationOutput != null) {
+                        validationOutput.add(msg);
+                    } else {
+                        warningTracker.warnOnce("missing-message:" + worldName + ":" + key, "World " + worldName + " event " + key + " references missing message id: " + messageId);
+                    }
+                }
+            }
+        }
+    }
+
+    private PluginConfig loadPluginConfig() {
+        return loadPluginConfigFromFile(new File(plugin.getDataFolder(), "config.yaml"));
     }
 
     private MessageConfig loadMessageConfig(PluginConfig pluginConfig) {
@@ -134,7 +292,7 @@ public class ConfigManager {
         }
 
         if (validate) {
-            validateEventConfig(pluginConfig, messageConfig, eventConfig, registry);
+            validateEventConfigTo(pluginConfig, messageConfig, eventConfig, registry, null);
         }
 
         return eventConfig;
@@ -164,47 +322,5 @@ public class ConfigManager {
                 || section.contains("require-permission")
                 || section.contains("conditions")
                 || section.contains("rate-limit");
-    }
-
-    private void validateEventConfig(
-            PluginConfig pluginConfig,
-            MessageConfig messageConfig,
-            EventConfig eventConfig,
-            EventRegistry registry
-    ) {
-        if (!pluginConfig.shouldValidate()) {
-            return;
-        }
-
-        for (String key : eventConfig.getAllConfiguredKeys()) {
-            boolean matches = registry.getDefinitions().stream()
-                    .anyMatch(definition -> EventKeyMatcher.matches(key, definition.getKey()));
-            if (!matches && pluginConfig.warnOnUnresolvedEvents() && pluginConfig.isLogInvalidEvents()) {
-                warningTracker.warnOnce("invalid-event:" + key,
-                        "Configured event key does not match any supported event: " + key);
-            }
-        }
-
-        for (Map.Entry<String, EventRule> entry : eventConfig.getEventRules().entrySet()) {
-            String key = entry.getKey();
-            EventRule rule = entry.getValue();
-            String messageId = rule.getMessage();
-            if (messageId != null && !messageId.isEmpty() && !messageConfig.hasMessage(messageId)) {
-                warningTracker.warnOnce("missing-message:" + key,
-                        "Event " + key + " references missing message id: " + messageId);
-            }
-        }
-
-        for (Map.Entry<String, WorldEventConfig> entry : eventConfig.getWorldConfigs().entrySet()) {
-            String worldName = entry.getKey();
-            for (Map.Entry<String, EventRule> ruleEntry : entry.getValue().getEventRules().entrySet()) {
-                String key = ruleEntry.getKey();
-                String messageId = ruleEntry.getValue().getMessage();
-                if (messageId != null && !messageId.isEmpty() && !messageConfig.hasMessage(messageId)) {
-                    warningTracker.warnOnce("missing-message:" + worldName + ":" + key,
-                            "World " + worldName + " event " + key + " references missing message id: " + messageId);
-                }
-            }
-        }
     }
 }

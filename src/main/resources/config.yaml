@@ -68,6 +68,8 @@ commands:
     permission: allthewebhooks.stats
   reload:
     permission: allthewebhooks.reload
+  validate:
+    permission: allthewebhooks.validate
   docs:
     permission: allthewebhooks.docs
   fire:

@@ -1,5 +1,26 @@
 # Commands
 
+## validate — Validate config files
+
+The **validate** subcommand checks `config.yaml`, `messages.yaml`, and `events.yaml` without reloading the live config. It reports file-not-found, load errors, missing default webhook, event keys that do not match any supported event, and event rules that reference missing message ids.
+
+### Usage
+
+```
+/allthewebhooks validate
+```
+
+### Permission
+
+- `allthewebhooks.validate` (default: op). Configurable in `config.yaml` under `commands.validate.permission`.
+
+### Output
+
+- **Validation passed. No issues found.** — All three files exist, load successfully, and cross-checks pass.
+- **Validation found N issue(s):** — Lists each issue with a short message (e.g. `config.yaml: default webhook is missing or has no URL`, `events.yaml: player.join references missing message id: unknown_msg`).
+
+---
+
 ## fire — Manually fire an event
 
 The **fire** subcommand lets you trigger an event by key and optional context data. It runs the same rule resolution and matching as normal in-game events (including dynamically added events from `events.yaml`), and reports to the console (or the commanding player) what happened.

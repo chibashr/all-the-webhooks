@@ -172,15 +172,15 @@ class DocumentationGeneratorTest {
     }
 
     @Test
-    void generate_includesPlaceholderRegexSpecSection() throws IOException {
+    void generate_includesRegexSection() throws IOException {
         EventRegistry registry = EventRegistry.createDefault();
         DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);
         generator.generate();
         Path docsHtml = dataFolder.resolve("docs").resolve("docs.html");
         String content = Files.readString(docsHtml);
-        assertTrue(content.contains("placeholder-regex"));
-        assertTrue(content.contains("Placeholder regex (spec)"));
+        assertTrue(content.contains("id=\"regex\"") || content.contains("data-anchor=\"regex\""), "docs.html should have regex section");
+        assertTrue(content.contains("<h1>Regex</h1>"));
         assertTrue(content.contains("regex:pattern:replacement"));
-        assertTrue(content.contains("hardcore-26"), "Placeholder regex example should show hardcore-26");
+        assertTrue(content.contains("hardcore-26"), "Regex example should show hardcore-26");
     }
 }

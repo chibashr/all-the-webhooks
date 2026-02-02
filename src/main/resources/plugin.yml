@@ -7,7 +7,7 @@ description: Opt-in in-game event webhooks for Paper and Folia.
 commands:
   allthewebhooks:
     description: All the Webhooks admin commands.
-    usage: /allthewebhooks <reload|stats|docs generate|fire <eventKey> [key=value ...] [--dry-run]>
+    usage: /allthewebhooks <reload|stats|validate|docs generate|fire <eventKey> [key=value ...] [--dry-run]>
     permission: allthewebhooks.use
 permissions:
   allthewebhooks.use:
@@ -15,6 +15,8 @@ permissions:
   allthewebhooks.stats:
     default: op
   allthewebhooks.reload:
+    default: op
+  allthewebhooks.validate:
     default: op
   allthewebhooks.docs:
     default: op

@@ -28,7 +28,7 @@ public class AdminCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            sender.sendMessage("Usage: /allthewebhooks <reload|stats|docs generate|fire <eventKey> [key=value ...] [--dry-run]>");
+            sender.sendMessage("Usage: /allthewebhooks <reload|stats|validate|docs generate|fire <eventKey> [key=value ...] [--dry-run]>");
             return true;
         }
 
@@ -72,11 +72,32 @@ public class AdminCommand implements CommandExecutor {
                 sender.sendMessage("Documentation generation started.");
                 return true;
             }
+            case "validate" -> {
+                if (!sender.hasPermission(config.validatePermission())) {
+                    sender.sendMessage("You do not have permission to validate config.");
+                    return true;
+                }
+                return handleValidate(sender);
+            }
             default -> {
-                sender.sendMessage("Unknown subcommand. Use reload, stats, docs generate, or fire.");
+                sender.sendMessage("Unknown subcommand. Use reload, stats, validate, docs generate, or fire.");
                 return true;
             }
         }
+    }
+
+    private boolean handleValidate(CommandSender sender) {
+        sender.sendMessage("Validating config.yaml, messages.yaml, events.yaml...");
+        List<String> issues = configManager.runValidation();
+        if (issues.isEmpty()) {
+            sender.sendMessage("Validation passed. No issues found.");
+            return true;
+        }
+        sender.sendMessage("Validation found " + issues.size() + " issue(s):");
+        for (String issue : issues) {
+            sender.sendMessage("  " + issue);
+        }
+        return true;
     }
 
     private boolean handleFire(CommandSender sender, String[] args) {

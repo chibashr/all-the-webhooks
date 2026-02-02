@@ -91,18 +91,6 @@ class DocumentationGeneratorTest {
     }
 
     @Test
-    void generate_producesReadmeHtml() throws IOException {
-        EventRegistry registry = EventRegistry.createDefault();
-        DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);
-        generator.generate();
-        Path readmeHtml = dataFolder.resolve("docs").resolve("README.html");
-        assertTrue(Files.isRegularFile(readmeHtml));
-        String content = Files.readString(readmeHtml);
-        assertTrue(content.contains("<!DOCTYPE html"));
-        assertTrue(content.contains("docs.html"));
-    }
-
-    @Test
     void generate_withDefaultRegistry_includesEventKeysInDocsHtml() throws IOException {
         EventRegistry registry = EventRegistry.createDefault();
         DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);

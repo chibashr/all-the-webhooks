@@ -43,7 +43,6 @@ public class DocumentationGenerator {
 
         writeFile(new File(docsDir, "docs.html"), buildDocsHtml(events));
         writeFile(new File(docsDir, "events.json"), buildEventsJson(events));
-        writeFile(new File(docsDir, "README.html"), buildReadmeHtml());
     }
 
     private void writeFile(File file, String content) {
@@ -555,22 +554,6 @@ public class DocumentationGenerator {
             builder.append("}");
         }
         builder.append("]");
-        return builder.toString();
-    }
-
-    private String buildReadmeHtml() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("<!DOCTYPE html><html><head><meta charset=\"utf-8\">");
-        builder.append("<title>All the Webhooks - README</title>");
-        builder.append("<style>body{font-family:Arial, sans-serif;padding:24px;background:#141414;color:#e8e8e8;}");
-        builder.append("code{background:#222;padding:2px 4px;border-radius:4px;}</style>");
-        builder.append("</head><body>");
-        builder.append("<h1>All the Webhooks</h1>");
-        builder.append("<p>Configure events in <code>events.yaml</code>, messages in <code>messages.yaml</code>, ");
-        builder.append("and webhooks in <code>config.yaml</code>.</p>");
-        builder.append("<p>Generate docs with <code>/allthewebhooks docs generate</code>.</p>");
-        builder.append("<p>Open <a href=\"docs.html\">docs.html</a> for the full documentation.</p>");
-        builder.append("</body></html>");
         return builder.toString();
     }
 

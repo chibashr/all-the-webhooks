@@ -3,9 +3,17 @@ package com.chibashr.allthewebhooks.config;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import org.bukkit.configuration.ConfigurationSection;
 
 public class EventRule {
+
+    /** Operator keys used in conditions; dotted condition keys are those whose value map contains these. */
+    private static final Set<String> OPERATOR_KEYS = Set.of(
+            "equals", "not", "greater-than", "less-than",
+            "greater-than-or-equal", "less-than-or-equal"
+    );
     private final Boolean enabled;
     private final String webhook;
     private final String message;
@@ -36,9 +44,7 @@ public class EventRule {
         Map<String, Object> conditions = new HashMap<>();
         ConfigurationSection conditionSection = section.getConfigurationSection("conditions");
         if (conditionSection != null) {
-            for (String key : conditionSection.getKeys(false)) {
-                conditions.put(key, conditionSection.get(key));
-            }
+            collectConditionsWithDottedKeys(conditionSection, conditions);
         }
 
         Integer rateLimit = null;
@@ -55,6 +61,48 @@ public class EventRule {
                 conditions,
                 rateLimit
         );
+    }
+
+    /**
+     * Collects condition keys including dotted paths (e.g. world.environment).
+     * Bukkit's getKeys(false) only returns the first path segment, so we use getKeys(true)
+     * and only add keys whose value is an operator map or a short-form primitive.
+     */
+    private static void collectConditionsWithDottedKeys(ConfigurationSection conditionSection, Map<String, Object> conditions) {
+        Set<String> allKeys = new TreeSet<>((a, b) -> {
+            int cmp = Integer.compare(a.length(), b.length());
+            return cmp != 0 ? cmp : a.compareTo(b);
+        });
+        allKeys.addAll(conditionSection.getKeys(true));
+
+        for (String key : allKeys) {
+            Object value = conditionSection.get(key);
+            if (value instanceof ConfigurationSection subsection) {
+                boolean hasOperator = false;
+                for (String subKey : subsection.getKeys(false)) {
+                    if (OPERATOR_KEYS.contains(subKey)) {
+                        hasOperator = true;
+                        break;
+                    }
+                }
+                if (hasOperator) {
+                    conditions.put(key, subsection.getValues(false));
+                }
+            } else {
+                if (value != null) {
+                    boolean parentAlreadyAdded = false;
+                    for (String existing : conditions.keySet()) {
+                        if (key.startsWith(existing + ".")) {
+                            parentAlreadyAdded = true;
+                            break;
+                        }
+                    }
+                    if (!parentAlreadyAdded) {
+                        conditions.put(key, value);
+                    }
+                }
+            }
+        }
     }
 
     public Boolean getEnabled() {

@@ -122,4 +122,34 @@ class RuleEngineTest {
         Map<String, Object> context = Map.of("block.type", "DIAMOND_ORE", "damage.amount", 5);
         assertFalse(engine.evaluate(conditions, context));
     }
+
+    @Test
+    void evaluate_worldLoad_worldNameNotList_matchesMainWorld() {
+        Map<String, Object> conditions = Map.of("world.name", Map.of("not", List.of("world_nether", "world_the_end")));
+        Map<String, Object> context = Map.of(
+                "event.name", "world.load",
+                "world.name", "world"
+        );
+        assertTrue(engine.evaluate(conditions, context));
+    }
+
+    @Test
+    void evaluate_worldLoad_worldNameNotList_rejectsNether() {
+        Map<String, Object> conditions = Map.of("world.name", Map.of("not", List.of("world_nether", "world_the_end")));
+        Map<String, Object> context = Map.of(
+                "event.name", "world.load",
+                "world.name", "world_nether"
+        );
+        assertFalse(engine.evaluate(conditions, context));
+    }
+
+    @Test
+    void evaluate_worldLoad_worldNameNotList_rejectsTheEnd() {
+        Map<String, Object> conditions = Map.of("world.name", Map.of("not", List.of("world_nether", "world_the_end")));
+        Map<String, Object> context = Map.of(
+                "event.name", "world.load",
+                "world.name", "world_the_end"
+        );
+        assertFalse(engine.evaluate(conditions, context));
+    }
 }

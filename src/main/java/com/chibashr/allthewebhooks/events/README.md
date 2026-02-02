@@ -18,7 +18,7 @@ Built-in definitions (e.g. `player.join`, `server.enable`) and events handled by
 
 ### Built-in world events
 
-**world.load** — Fired when a world is loaded or created (`WorldLoadEvent`). Predicates: `world.name`, `world.seed`, `world.environment`, `world.difficulty`, `world.min_height`, `world.max_height`, `world.hardcore`, `world.spawn_location`, `world.structures`, `world.folder`. Use in `events.yaml` with `message: world_load` (or `generic`) and optional `conditions` on any of these fields.
+**world.load** — Fired when a world is loaded or created (`WorldLoadEvent`). Predicates: `world.name`, `world.seed`, `world.environment`, `world.difficulty`, `world.min_height`, `world.max_height`, `world.hardcore`, `world.spawn_location`, `world.structures`, `world.folder`. Use in `events.yaml` with `message: world_load` (or `generic`) and optional `conditions` on any of these fields. Condition keys may be dotted (e.g. `world.name` with `not: [world_nether, world_the_end]`) so only the main world matches when you exclude Nether/The End.
 
 **Startup catch-up:** Because the plugin loads after the world (and after some players may have joined), it does not receive `WorldLoadEvent` or `PlayerJoinEvent` for state that already existed at enable. On enable the plugin emits synthetic events for that state so nothing is missed: a **world.load** context for each world in `server.getWorlds()`, and a **player.join** context for each player in `server.getOnlinePlayers()`.
 

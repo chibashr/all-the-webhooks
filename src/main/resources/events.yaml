@@ -13,6 +13,14 @@ worlds:
     enabled: false
 
 events:
+  # world.load:
+  #   message: world_load
+  #   conditions:
+  #     world.name:
+  #       not:
+  #         - "world_nether"
+  #         - "world_the_end"
+
   # player.join:
   #   message: player_join
 

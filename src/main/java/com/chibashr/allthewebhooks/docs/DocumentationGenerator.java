@@ -54,17 +54,20 @@ public class DocumentationGenerator {
     }
 
     private String buildDocsHtml(List<EventDefinition> events) {
-        String sidebar = buildDocsSidebar(events, true);
-        String content = buildDocsContent(events);
+        List<EventDefinition> baseEvents = events.stream().filter(e -> !e.isSubEvent()).toList();
+        List<EventDefinition> subEvents = events.stream().filter(EventDefinition::isSubEvent).toList();
+        String sidebar = buildWikiSidebar(events, baseEvents, subEvents);
+        String content = buildWikiContent(events, baseEvents, subEvents);
         return buildDocsShell("All the Webhooks - Documentation", sidebar, content);
     }
 
     private String buildDocsShell(String title, String sidebar, String content) {
         StringBuilder builder = new StringBuilder();
         builder.append("<!DOCTYPE html>\n");
-        builder.append("<html>\n");
+        builder.append("<html lang=\"en\">\n");
         builder.append("<head>\n");
         builder.append("<meta charset=\"utf-8\">\n");
+        builder.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
         builder.append("<title>").append(HtmlEscaper.escape(title)).append("</title>\n");
         builder.append("<style>\n");
         builder.append(buildStyles());
@@ -72,11 +75,14 @@ public class DocumentationGenerator {
         builder.append("</head>\n");
         builder.append("<body>\n");
         builder.append("<div class=\"layout\">\n");
-        builder.append("<div class=\"sidebar\">\n");
         builder.append(sidebar);
+        builder.append("<div class=\"main-content\">\n");
+        builder.append("<div class=\"content-header\">\n");
+        builder.append("<div class=\"breadcrumb\" id=\"breadcrumb\"></div>\n");
+        builder.append("<div class=\"content-title\" id=\"headerTitle\">All the Webhooks</div>\n");
+        builder.append("<div class=\"content-meta\" id=\"headerMeta\">Select a section from the sidebar</div>\n");
         builder.append("</div>\n");
-        builder.append("<div class=\"content\">\n");
-        builder.append("<div class=\"content-inner\">\n");
+        builder.append("<div class=\"content-body\" id=\"contentBody\">\n");
         builder.append(content);
         builder.append("</div>\n");
         builder.append("</div>\n");
@@ -89,34 +95,177 @@ public class DocumentationGenerator {
         return builder.toString();
     }
 
-    private String buildDocsSidebar(List<EventDefinition> events, boolean includeSections) {
+    /** Derives subcategory from event key (second segment, e.g. player.death → death). */
+    private String getSubcategory(EventDefinition e) {
+        String[] parts = e.getKey().split("\\.");
+        return parts.length >= 2 ? parts[1] : null;
+    }
+
+    private String buildWikiSidebar(List<EventDefinition> events, List<EventDefinition> baseEvents,
+            List<EventDefinition> subEvents) {
         StringBuilder builder = new StringBuilder();
+        builder.append("<div class=\"sidebar\">\n");
         builder.append("<div class=\"sidebar-header\">\n");
         builder.append("<div class=\"sidebar-title\">All the Webhooks</div>\n");
         builder.append("<div class=\"meta\">Version: ").append(HtmlEscaper.escape(plugin.getDescription().getVersion()))
                 .append("</div>\n");
         builder.append("<div class=\"meta\">Server: ").append(HtmlEscaper.escape(plugin.getServer().getVersion()))
                 .append("</div>\n");
-        builder.append("<div class=\"meta\">Generated: ").append(Instant.now().toString()).append("</div>\n");
+        builder.append("<input type=\"text\" class=\"search-input\" id=\"globalSearch\" placeholder=\"Search docs...\">\n");
         builder.append("</div>\n");
-        builder.append("<input class=\"search\" id=\"search\" placeholder=\"Search events or predicates\" />\n");
-        builder.append("<div class=\"nav\">\n");
-        if (includeSections) {
-            builder.append("<div class=\"nav-section\">\n");
-            builder.append("<div class=\"nav-heading\">Docs</div>\n");
-            builder.append("<a class=\"nav-anchor nav-link\" href=\"#overview\">Overview</a>\n");
-            builder.append("<a class=\"nav-anchor nav-link\" href=\"#quick-start\">Quick start</a>\n");
-            builder.append("<a class=\"nav-anchor nav-link\" href=\"#event-keys\">Event key hierarchy</a>\n");
-            builder.append("<a class=\"nav-anchor nav-link\" href=\"#message-structure\">Message structure</a>\n");
-            builder.append("<a class=\"nav-anchor nav-link\" href=\"#conditions\">Conditions</a>\n");
-            builder.append("<a class=\"nav-anchor nav-link\" href=\"#webhook-display-name\">Webhook display name</a>\n");
-            builder.append("<a class=\"nav-anchor nav-link\" href=\"#regex\">Regex</a>\n");
-            builder.append("<a class=\"nav-anchor nav-link\" href=\"#events\">Events</a>\n");
+        builder.append("<div class=\"nav-section\">\n");
+        builder.append("<div class=\"nav-section-title\">Documentation</div>\n");
+        builder.append("<div class=\"doc-nav\">\n");
+        builder.append("<div class=\"nav-link\" data-section=\"welcome\">Overview</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"quick-start\">Quick start</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"event-keys\">Event key hierarchy</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"message-structure\">Message structure</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"conditions\">Conditions</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"webhook-display-name\">Webhook display name</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"regex\">Regex</div>\n");
+        builder.append("</div>\n");
+        builder.append("</div>\n");
+        builder.append(buildEventsNavSection(baseEvents, "events", "Events", "Search events..."));
+        builder.append(buildEventsNavSection(subEvents, "sub-events", "Sub-events", "Search sub-events..."));
+        builder.append("</div>\n");
+        return builder.toString();
+    }
+
+    private String buildEventsNavSection(List<EventDefinition> events, String sectionId, String sectionTitle,
+            String searchPlaceholder) {
+        Map<String, Map<String, List<EventDefinition>>> hierarchical = new LinkedHashMap<>();
+        for (EventDefinition e : events) {
+            String category = e.getCategory();
+            String subcategory = getSubcategory(e);
+            String subcat = subcategory != null ? subcategory : "_root";
+            hierarchical.computeIfAbsent(category, k -> new LinkedHashMap<>())
+                    .computeIfAbsent(subcat, k -> new ArrayList<>()).add(e);
+        }
+        for (Map<String, List<EventDefinition>> subcats : hierarchical.values()) {
+            for (List<EventDefinition> list : subcats.values()) {
+                list.sort(Comparator.comparing(EventDefinition::getKey));
+            }
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append("<div class=\"nav-section\">\n");
+        builder.append("<div class=\"nav-section-title\">").append(HtmlEscaper.escape(sectionTitle)).append("</div>\n");
+        builder.append("<input type=\"text\" class=\"search-input ").append(sectionId).append("-search\" ");
+        builder.append("placeholder=\"").append(HtmlEscaper.escape(searchPlaceholder)).append("\">\n");
+        builder.append("<div class=\"sidebar-actions\">\n");
+        builder.append("<button class=\"action-btn ").append(sectionId).append("-expand\">Expand All</button>\n");
+        builder.append("<button class=\"action-btn ").append(sectionId).append("-collapse\">Collapse All</button>\n");
+        builder.append("</div>\n");
+        builder.append("<div class=\"category-nav\" id=\"").append(sectionId).append("Nav\">\n");
+        List<String> categories = new ArrayList<>(hierarchical.keySet());
+        categories.sort(String::compareTo);
+        for (String category : categories) {
+            Map<String, List<EventDefinition>> subcats = hierarchical.get(category);
+            int total = subcats.values().stream().mapToInt(List::size).sum();
+            boolean hasSubcats = subcats.size() > 1 || !subcats.containsKey("_root");
+            builder.append("<div class=\"category-group\">\n");
+            builder.append("<div class=\"category-header\">\n");
+            builder.append("<span class=\"category-toggle\">▶</span>\n");
+            builder.append("<span class=\"category-name\">").append(HtmlEscaper.escape(category)).append("</span>\n");
+            builder.append("<span class=\"event-count\">").append(total).append("</span>\n");
+            builder.append("</div>\n");
+            builder.append("<div class=\"category-events\">\n");
+            if (hasSubcats) {
+                List<String> subcatKeys = new ArrayList<>(subcats.keySet());
+                subcatKeys.sort((a, b) -> a.equals("_root") ? 1 : b.equals("_root") ? -1 : a.compareTo(b));
+                for (String subcat : subcatKeys) {
+                    if ("_root".equals(subcat)) {
+                        for (EventDefinition e : subcats.get(subcat)) {
+                            builder.append(buildEventNavLink(e, sectionId, 40));
+                        }
+                    } else {
+                        List<EventDefinition> subList = subcats.get(subcat);
+                        builder.append("<div class=\"subcategory-group\">\n");
+                        builder.append("<div class=\"subcategory-header\">\n");
+                        builder.append("<span class=\"subcategory-toggle\">▶</span>\n");
+                        builder.append("<span class=\"category-name\">").append(HtmlEscaper.escape(subcat)).append("</span>\n");
+                        builder.append("<span class=\"event-count\">").append(subList.size()).append("</span>\n");
+                        builder.append("</div>\n");
+                        builder.append("<div class=\"subcategory-events\">\n");
+                        for (EventDefinition e : subList) {
+                            builder.append(buildEventNavLink(e, sectionId, 60));
+                        }
+                        builder.append("</div>\n");
+                        builder.append("</div>\n");
+                    }
+                }
+            } else {
+                for (EventDefinition e : subcats.get("_root")) {
+                    builder.append(buildEventNavLink(e, sectionId, 40));
+                }
+            }
+            builder.append("</div>\n");
             builder.append("</div>\n");
         }
-        builder.append("<div class=\"nav-section\">\n");
-        builder.append("<div class=\"nav-heading\">Event index</div>\n");
-        builder.append(buildNavigation(events));
+        builder.append("</div>\n");
+        builder.append("</div>\n");
+        return builder.toString();
+    }
+
+    private String buildEventNavLink(EventDefinition e, String sectionId, int indentPx) {
+        return "<div class=\"event-link\" data-section=\"" + sectionId + "\" data-event-key=\""
+                + HtmlEscaper.escape(e.getKey()) + "\" style=\"padding-left:" + indentPx + "px\">"
+                + HtmlEscaper.escape(e.getKey()) + "</div>\n";
+    }
+
+    private String buildWikiContent(List<EventDefinition> events, List<EventDefinition> baseEvents,
+            List<EventDefinition> subEvents) {
+        Map<String, EventDefinition> byKey = new LinkedHashMap<>();
+        for (EventDefinition e : events) {
+            byKey.put(e.getKey(), e);
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append("<div id=\"welcomePanel\" class=\"panel active\">\n");
+        builder.append(buildWelcomeContent(events, baseEvents, subEvents));
+        builder.append("</div>\n");
+        builder.append("<div id=\"quick-startPanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildQuickStartSection()));
+        builder.append("</div>\n");
+        builder.append("<div id=\"event-keysPanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildEventKeysSection(events)));
+        builder.append("</div>\n");
+        builder.append("<div id=\"message-structurePanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildMessageStructureSection()));
+        builder.append("</div>\n");
+        builder.append("<div id=\"conditionsPanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildConditionsSection()));
+        builder.append("</div>\n");
+        builder.append("<div id=\"webhook-display-namePanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildWebhookDisplayNameSection()));
+        builder.append("</div>\n");
+        builder.append("<div id=\"regexPanel\" class=\"panel\"><div id=\"regex\" data-anchor=\"regex\">\n");
+        builder.append(innerContent(buildPlaceholderRegexSpecSection()));
+        builder.append("</div></div>\n");
+        builder.append("<div id=\"eventDetailPanel\" class=\"panel\"></div>\n");
+        builder.append("<script>window.__eventsData=").append(buildEventsJson(events)).append(";</script>\n");
+        return builder.toString();
+    }
+
+    private String innerContent(String sectionHtml) {
+        return sectionHtml.replaceFirst("<section[^>]*>", "").replaceFirst("</section>", "");
+    }
+
+    private String buildWelcomeContent(List<EventDefinition> events, List<EventDefinition> baseEvents,
+            List<EventDefinition> subEvents) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<div class=\"welcome-screen\">\n");
+        builder.append("<h1 class=\"welcome-title\">All the Webhooks</h1>\n");
+        builder.append("<p class=\"welcome-text\">Configure events in <code>events.yaml</code>, messages in ");
+        builder.append("<code>messages.yaml</code>, and webhooks in <code>config.yaml</code>. ");
+        builder.append("Generate docs with <code>/allthewebhooks docs generate</code>.</p>\n");
+        builder.append("<p class=\"welcome-text\">Use the sidebar to browse documentation, events, and sub-events. ");
+        builder.append("Each event includes predicates and wildcard patterns for filtering.</p>\n");
+        builder.append("<div class=\"stats-grid\">\n");
+        builder.append("<div class=\"stat-card\"><div class=\"stat-value\">").append(events.size()).append("</div>");
+        builder.append("<div class=\"stat-label\">Total Events</div></div>\n");
+        builder.append("<div class=\"stat-card\"><div class=\"stat-value\">").append(baseEvents.size()).append("</div>");
+        builder.append("<div class=\"stat-label\">Base Events</div></div>\n");
+        builder.append("<div class=\"stat-card\"><div class=\"stat-value\">").append(subEvents.size()).append("</div>");
+        builder.append("<div class=\"stat-label\">Sub-events</div></div>\n");
         builder.append("</div>\n");
         builder.append("</div>\n");
         return builder.toString();
@@ -444,218 +593,206 @@ public class DocumentationGenerator {
 
     private String buildStyles() {
         StringBuilder builder = new StringBuilder();
-        builder.append(":root {\n");
-        builder.append("  --bg: #141414;\n");
-        builder.append("  --sidebar-bg: #1f1f1f;\n");
-        builder.append("  --panel-bg: #1b1b1b;\n");
-        builder.append("  --text: #e8e8e8;\n");
-        builder.append("  --muted: #b0b0b0;\n");
-        builder.append("  --accent: #7fbfff;\n");
-        builder.append("  --accent-soft: rgba(127, 191, 255, 0.14);\n");
-        builder.append("  --border: #2f2f2f;\n");
-        builder.append("  --code-bg: #222222;\n");
-        builder.append("  --radius: 6px;\n");
-        builder.append("  --space-1: 4px;\n");
-        builder.append("  --space-2: 8px;\n");
-        builder.append("  --space-3: 16px;\n");
-        builder.append("  --space-4: 24px;\n");
-        builder.append("  --space-5: 32px;\n");
-        builder.append("  --max-width: 72ch;\n");
-        builder.append("}\n");
-        builder.append("* { box-sizing: border-box; }\n");
-        builder.append("body {\n");
-        builder.append("  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n");
-        builder.append("  margin: 0;\n");
-        builder.append("  color: var(--text);\n");
-        builder.append("  background: var(--bg);\n");
-        builder.append("  line-height: 1.6;\n");
-        builder.append("}\n");
-        builder.append("a { color: var(--accent); text-decoration: none; }\n");
+        builder.append("* { margin: 0; padding: 0; box-sizing: border-box; }\n");
+        builder.append("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; ");
+        builder.append("background: #1a1a1a; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }\n");
+        builder.append(".layout { display: flex; flex: 1; overflow: hidden; }\n");
+        builder.append(".sidebar { width: 300px; background: #2d2d2d; border-right: 1px solid #404040; ");
+        builder.append("display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }\n");
+        builder.append(".sidebar-header { padding: 20px; border-bottom: 1px solid #404040; background: #252525; flex-shrink: 0; }\n");
+        builder.append(".sidebar-title { font-size: 14px; font-weight: 600; color: #888; text-transform: uppercase; ");
+        builder.append("letter-spacing: 1px; margin-bottom: 15px; }\n");
+        builder.append(".search-input { width: 100%; padding: 8px 12px; background: #1a1a1a; border: 1px solid #404040; ");
+        builder.append("border-radius: 4px; color: #e0e0e0; font-size: 13px; }\n");
+        builder.append(".search-input:focus { outline: none; border-color: #4a9eff; }\n");
+        builder.append(".nav-section { flex: 1; overflow-y: auto; padding: 10px 0; }\n");
+        builder.append(".nav-section-title { padding: 12px 20px; font-size: 12px; font-weight: 600; color: #888; ");
+        builder.append("text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; background: #2d2d2d; z-index: 10; }\n");
+        builder.append(".nav-link { padding: 8px 20px; cursor: pointer; color: #b0b0b0; font-size: 14px; ");
+        builder.append("transition: background 0.15s, color 0.15s; }\n");
+        builder.append(".nav-link:hover, .nav-link.active { background: #353535; color: #e0e0e0; }\n");
+        builder.append(".nav-link.active { color: #4a9eff; }\n");
+        builder.append(".doc-nav .nav-link { padding-left: 20px; }\n");
+        builder.append(".category-group { margin-bottom: 2px; }\n");
+        builder.append(".category-header, .subcategory-header { cursor: pointer; display: flex; align-items: center; gap: 8px; ");
+        builder.append("color: #b0b0b0; font-size: 14px; transition: background 0.15s, color 0.15s; user-select: none; }\n");
+        builder.append(".category-header { padding: 8px 20px; }\n");
+        builder.append(".category-header:hover, .subcategory-header:hover { background: #353535; color: #e0e0e0; }\n");
+        builder.append(".category-toggle, .subcategory-toggle { font-size: 9px; transition: transform 0.2s; color: #888; width: 12px; flex-shrink: 0; }\n");
+        builder.append(".category-group.expanded > .category-header .category-toggle, ");
+        builder.append(".subcategory-group.expanded > .subcategory-header .subcategory-toggle { transform: rotate(90deg); }\n");
+        builder.append(".subcategory-header { padding: 6px 20px 6px 40px; font-size: 13px; color: #999; }\n");
+        builder.append(".subcategory-header:hover { background: #323232; color: #b0b0b0; }\n");
+        builder.append(".category-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n");
+        builder.append(".event-count { font-size: 11px; color: #666; background: #222; padding: 2px 6px; border-radius: 10px; flex-shrink: 0; }\n");
+        builder.append(".category-events, .subcategory-events { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }\n");
+        builder.append(".category-group.expanded > .category-events { max-height: 5000px; }\n");
+        builder.append(".subcategory-group.expanded > .subcategory-events { max-height: 3000px; }\n");
+        builder.append(".event-link { padding: 6px 20px 6px 40px; cursor: pointer; color: #888; font-size: 12px; ");
+        builder.append("font-family: 'Courier New', monospace; transition: background 0.15s, color 0.15s; overflow: hidden; text-overflow: ellipsis; }\n");
+        builder.append(".event-link:hover { background: #323232; color: #b0b0b0; }\n");
+        builder.append(".event-link.active { background: #3d5266; color: #4a9eff; }\n");
+        builder.append(".sidebar-actions { padding: 10px 20px; border-bottom: 1px solid #404040; display: flex; gap: 8px; }\n");
+        builder.append(".action-btn { flex: 1; padding: 6px 12px; background: #1a1a1a; border: 1px solid #404040; ");
+        builder.append("color: #888; font-size: 11px; cursor: pointer; border-radius: 3px; transition: all 0.15s; }\n");
+        builder.append(".action-btn:hover { background: #252525; color: #b0b0b0; border-color: #4a9eff; }\n");
+        builder.append(".main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }\n");
+        builder.append(".content-header { padding: 20px 40px; border-bottom: 1px solid #404040; background: #252525; flex-shrink: 0; }\n");
+        builder.append(".content-title { font-size: 32px; font-weight: 600; color: #e0e0e0; margin-bottom: 12px; }\n");
+        builder.append(".content-meta { font-size: 13px; color: #888; line-height: 1.6; }\n");
+        builder.append(".breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 12px; color: #666; }\n");
+        builder.append(".breadcrumb-separator { color: #444; }\n");
+        builder.append(".breadcrumb-item { color: #888; }\n");
+        builder.append(".breadcrumb-item.active { color: #4a9eff; }\n");
+        builder.append(".content-body { flex: 1; overflow-y: auto; padding: 40px; }\n");
+        builder.append(".panel { display: none; }\n");
+        builder.append(".panel.active { display: block; }\n");
+        builder.append(".welcome-screen { max-width: 800px; }\n");
+        builder.append(".welcome-title { font-size: 36px; font-weight: 600; margin-bottom: 20px; }\n");
+        builder.append(".welcome-text { font-size: 16px; line-height: 1.8; color: #b0b0b0; margin-bottom: 20px; }\n");
+        builder.append(".stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; }\n");
+        builder.append(".stat-card { padding: 20px; background: #252525; border: 1px solid #404040; border-radius: 4px; }\n");
+        builder.append(".stat-value { font-size: 32px; font-weight: 700; color: #4a9eff; margin-bottom: 8px; }\n");
+        builder.append(".stat-label { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }\n");
+        builder.append(".event-detail { max-width: 900px; }\n");
+        builder.append(".event-name { font-size: 24px; font-weight: 600; color: #e0e0e0; font-family: 'Courier New', monospace; margin-bottom: 12px; }\n");
+        builder.append(".event-badges { display: flex; gap: 8px; flex-wrap: wrap; }\n");
+        builder.append(".event-category-badge { padding: 4px 10px; background: #3d5266; color: #4a9eff; font-size: 12px; ");
+        builder.append("font-weight: 600; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.5px; }\n");
+        builder.append(".event-subcategory-badge { padding: 4px 10px; background: #2d3d4a; color: #7fb8e8; font-size: 11px; font-weight: 600; border-radius: 3px; }\n");
+        builder.append(".event-description { margin-top: 20px; padding: 16px; background: #252525; border-left: 3px solid #4a9eff; ");
+        builder.append("color: #b0b0b0; line-height: 1.6; }\n");
+        builder.append(".section { margin-top: 40px; }\n");
+        builder.append(".section-heading { font-size: 18px; font-weight: 600; color: #e0e0e0; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #404040; }\n");
+        builder.append(".predicates-table { width: 100%; border-collapse: collapse; font-family: 'Courier New', monospace; font-size: 13px; }\n");
+        builder.append(".predicates-table th { text-align: left; padding: 12px; background: #252525; color: #888; font-weight: 600; ");
+        builder.append("text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #404040; }\n");
+        builder.append(".predicates-table td { padding: 12px; border-bottom: 1px solid #2a2a2a; color: #b0b0b0; }\n");
+        builder.append(".predicates-table tr:hover { background: #252525; }\n");
+        builder.append(".type-badge { padding: 2px 8px; background: #333; color: #888; border-radius: 3px; font-size: 11px; }\n");
+        builder.append(".type-badge.string { background: #2d4436; color: #6abf76; }\n");
+        builder.append(".type-badge.number { background: #3d3d2d; color: #d4c77f; }\n");
+        builder.append(".type-badge.boolean { background: #3d2d36; color: #c67f9f; }\n");
+        builder.append(".wildcards-list { list-style: none; padding: 0; }\n");
+        builder.append(".wildcard-item { padding: 10px 12px; background: #252525; border-left: 2px solid #4a9eff; ");
+        builder.append("margin-bottom: 6px; font-family: 'Courier New', monospace; font-size: 13px; color: #b0b0b0; }\n");
+        builder.append("code, pre { font-family: 'Courier New', monospace; background: #252525; padding: 2px 6px; border-radius: 3px; font-size: 13px; color: #6abf76; }\n");
+        builder.append("pre { padding: 16px; overflow: auto; border-left: 3px solid #4a9eff; display: block; }\n");
+        builder.append("a { color: #4a9eff; text-decoration: none; }\n");
         builder.append("a:hover { text-decoration: underline; }\n");
-        builder.append(".layout { display: flex; min-height: 100vh; }\n");
-        builder.append(".sidebar {\n");
-        builder.append("  width: 320px;\n");
-        builder.append("  max-width: 40vw;\n");
-        builder.append("  overflow: auto;\n");
-        builder.append("  background: var(--sidebar-bg);\n");
-        builder.append("  padding: var(--space-4) var(--space-3);\n");
-        builder.append("  border-right: 1px solid var(--border);\n");
-        builder.append("  position: sticky;\n");
-        builder.append("  top: 0;\n");
-        builder.append("  height: 100vh;\n");
-        builder.append("}\n");
-        builder.append(".sidebar-title { font-size: 1.1rem; font-weight: 600; }\n");
-        builder.append(".content { flex: 1; overflow: auto; padding: var(--space-5) var(--space-4); }\n");
-        builder.append(".content-inner { max-width: var(--max-width); }\n");
+        builder.append(".meta { color: #888; font-size: 0.85rem; }\n");
         builder.append("h1 { margin-top: 0; font-size: 1.8rem; }\n");
-        builder.append("h2 { margin-top: var(--space-5); font-size: 1.3rem; }\n");
-        builder.append("h3 { margin-top: var(--space-4); font-size: 1rem; }\n");
-        builder.append(".meta { color: var(--muted); font-size: 0.85rem; }\n");
-        builder.append(".doc-section { margin-bottom: var(--space-5); }\n");
-        builder.append(".search {\n");
-        builder.append("  width: 100%;\n");
-        builder.append("  padding: 8px 10px;\n");
-        builder.append("  margin: var(--space-3) 0;\n");
-        builder.append("  background: var(--panel-bg);\n");
-        builder.append("  border: 1px solid var(--border);\n");
-        builder.append("  color: var(--text);\n");
-        builder.append("  border-radius: var(--radius);\n");
-        builder.append("}\n");
-        builder.append(".nav { margin-top: var(--space-2); }\n");
-        builder.append(".nav-section { margin-bottom: var(--space-3); }\n");
-        builder.append(".nav-heading {\n");
-        builder.append("  font-size: 0.75rem;\n");
-        builder.append("  text-transform: uppercase;\n");
-        builder.append("  letter-spacing: 0.08em;\n");
-        builder.append("  color: var(--muted);\n");
-        builder.append("  margin: var(--space-2) 0;\n");
-        builder.append("}\n");
-        builder.append(".nav-anchor {\n");
-        builder.append("  display: block;\n");
-        builder.append("  padding: 4px 8px;\n");
-        builder.append("  border-radius: var(--radius);\n");
-        builder.append("  color: var(--text);\n");
-        builder.append("}\n");
-        builder.append(".nav-anchor:hover { background: var(--panel-bg); text-decoration: none; }\n");
-        builder.append(".nav-anchor.active {\n");
-        builder.append("  background: var(--accent-soft);\n");
-        builder.append("  color: var(--accent);\n");
-        builder.append("}\n");
-        builder.append("details { margin-left: var(--space-2); }\n");
-        builder.append("details summary { cursor: pointer; padding: 4px 8px; border-radius: var(--radius); }\n");
-        builder.append("details summary:hover { background: var(--panel-bg); }\n");
-        builder.append(".nav-item { margin-left: var(--space-2); }\n");
-        builder.append(".event-entry {\n");
-        builder.append("  margin-bottom: var(--space-4);\n");
-        builder.append("  padding-bottom: var(--space-4);\n");
-        builder.append("  border-bottom: 1px solid var(--border);\n");
-        builder.append("}\n");
-        builder.append(".event-nest { margin-left: var(--space-4); border-left: 2px solid var(--border); padding-left: var(--space-3); }\n");
-        builder.append(".sub-events-section { border-top: 1px dashed var(--border); margin-top: var(--space-3); padding-top: var(--space-3); }\n");
-        builder.append(".sub-event-group { margin-top: var(--space-2); }\n");
-        builder.append(".sub-event-group summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }\n");
-        builder.append(".sub-event-list { list-style: none; padding-left: var(--space-3); margin: var(--space-2) 0; }\n");
-        builder.append(".sub-event-ref { padding: var(--space-1) 0; font-size: 0.9rem; border-bottom: 1px solid transparent; }\n");
-        builder.append(".sub-event-ref code { font-size: 0.85rem; }\n");
-        builder.append(".predicate-list li { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); align-items: center; }\n");
-        builder.append(".predicate-msg, .predicate-cond { font-size: 0.95em; }\n");
-        builder.append(".event-section { margin-top: var(--space-3); }\n");
-        builder.append("code, pre {\n");
-        builder.append("  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, \"Liberation Mono\", monospace;\n");
-        builder.append("  background: var(--code-bg);\n");
-        builder.append("  border-radius: var(--radius);\n");
-        builder.append("  color: var(--text);\n");
-        builder.append("}\n");
-        builder.append("code { padding: 2px 6px; }\n");
-        builder.append("pre {\n");
-        builder.append("  padding: var(--space-3);\n");
-        builder.append("  overflow: auto;\n");
-        builder.append("  border-left: 3px solid var(--accent);\n");
-        builder.append("}\n");
-        builder.append(".no-results {\n");
-        builder.append("  display: none;\n");
-        builder.append("  padding: var(--space-3);\n");
-        builder.append("  border: 1px dashed var(--border);\n");
-        builder.append("  border-radius: var(--radius);\n");
-        builder.append("  background: var(--panel-bg);\n");
-        builder.append("  margin: var(--space-3) 0;\n");
-        builder.append("}\n");
-        builder.append(".example-block {\n");
-        builder.append("  margin-top: var(--space-3);\n");
-        builder.append("  padding: var(--space-3);\n");
-        builder.append("  background: var(--panel-bg);\n");
-        builder.append("  border-radius: var(--radius);\n");
-        builder.append("  border: 1px solid var(--border);\n");
-        builder.append("}\n");
-        builder.append(".example-title { font-weight: 600; margin-bottom: var(--space-2); }\n");
-        builder.append(".inline-link { color: var(--accent); }\n");
+        builder.append("h2, h3 { margin-top: 24px; font-size: 1.2rem; }\n");
+        builder.append(".example-block { margin-top: 16px; padding: 16px; background: #252525; border-radius: 4px; border: 1px solid #404040; }\n");
+        builder.append(".example-title { font-weight: 600; margin-bottom: 8px; }\n");
+        builder.append(".predicate-list li { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; padding: 4px 0; }\n");
+        builder.append("::-webkit-scrollbar { width: 8px; height: 8px; }\n");
+        builder.append("::-webkit-scrollbar-track { background: #1a1a1a; }\n");
+        builder.append("::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }\n");
+        builder.append("::-webkit-scrollbar-thumb:hover { background: #4a4a4a; }\n");
         return builder.toString();
     }
 
     private String buildScripts() {
         StringBuilder builder = new StringBuilder();
         builder.append("(() => {\n");
-        builder.append("  const input = document.getElementById('search');\n");
-        builder.append("  const noResults = document.getElementById('no-results');\n");
-        builder.append("  const eventEntries = Array.from(document.querySelectorAll('.event-entry'));\n");
-        builder.append("  const navItems = Array.from(document.querySelectorAll('.nav-item'));\n");
-        builder.append("  const navAnchors = Array.from(document.querySelectorAll('.nav-anchor'));\n");
-        builder.append("  const detailsNodes = Array.from(document.querySelectorAll('.nav details'));\n");
-        builder.append("  const content = document.querySelector('.content');\n");
-        builder.append("  const anchorTargets = Array.from(document.querySelectorAll('[data-anchor]'));\n");
-        builder.append("  const anchorOffsets = () => anchorTargets.map(el => ({\n");
-        builder.append("    id: el.getAttribute('data-anchor'),\n");
-        builder.append("    top: el.offsetTop\n");
-        builder.append("  })).sort((a, b) => a.top - b.top);\n");
-        builder.append("  let cachedOffsets = anchorOffsets();\n");
+        builder.append("  const eventsData = window.__eventsData || [];\n");
+        builder.append("  const eventByKey = Object.fromEntries(eventsData.map(e => [e.event, e]));\n");
+        builder.append("  const contentBody = document.getElementById('contentBody');\n");
+        builder.append("  const headerTitle = document.getElementById('headerTitle');\n");
+        builder.append("  const headerMeta = document.getElementById('headerMeta');\n");
+        builder.append("  const breadcrumb = document.getElementById('breadcrumb');\n");
         builder.append("\n");
-        builder.append("  const setActiveAnchor = (id) => {\n");
-        builder.append("    if (!id) return;\n");
-        builder.append("    navAnchors.forEach(anchor => {\n");
-        builder.append("      const target = anchor.getAttribute('href').slice(1);\n");
-        builder.append("      anchor.classList.toggle('active', target === id);\n");
-        builder.append("    });\n");
-        builder.append("  };\n");
+        builder.append("  function showPanel(panelId) {\n");
+        builder.append("    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));\n");
+        builder.append("    const p = document.getElementById(panelId + 'Panel');\n");
+        builder.append("    if (p) p.classList.add('active');\n");
+        builder.append("    document.querySelectorAll('.nav-link, .event-link').forEach(el => el.classList.remove('active'));\n");
+        builder.append("  }\n");
         builder.append("\n");
-        builder.append("  const updateActiveOnScroll = () => {\n");
-        builder.append("    if (!content || cachedOffsets.length === 0) return;\n");
-        builder.append("    const scrollTop = content.scrollTop + 8;\n");
-        builder.append("    let current = cachedOffsets[0];\n");
-        builder.append("    for (const entry of cachedOffsets) {\n");
-        builder.append("      if (scrollTop >= entry.top) {\n");
-        builder.append("        current = entry;\n");
-        builder.append("      } else {\n");
-        builder.append("        break;\n");
+        builder.append("  function showEvent(event) {\n");
+        builder.append("    const sub = event.subcategory || getSubcategory(event);\n");
+        builder.append("    const bread = ['<span class=\"breadcrumb-item\">' + (event.parent_base_key ? 'Sub-events' : 'Events') + '</span>'];\n");
+        builder.append("    bread.push('<span class=\"breadcrumb-separator\">/</span>');\n");
+        builder.append("    bread.push('<span class=\"breadcrumb-item\">' + event.category + '</span>');\n");
+        builder.append("    if (sub) { bread.push('<span class=\"breadcrumb-separator\">/</span>'); bread.push('<span class=\"breadcrumb-item\">' + sub + '</span>'); }\n");
+        builder.append("    bread.push('<span class=\"breadcrumb-separator\">/</span>');\n");
+        builder.append("    bread.push('<span class=\"breadcrumb-item active\">' + event.event + '</span>');\n");
+        builder.append("    breadcrumb.innerHTML = bread.join('');\n");
+        builder.append("    headerTitle.textContent = event.event;\n");
+        builder.append("    headerMeta.textContent = event.description || '';\n");
+        builder.append("    let predicatesRows = '';\n");
+        builder.append("    if (event.predicates) {\n");
+        builder.append("      for (const [k, v] of Object.entries(event.predicates)) {\n");
+        builder.append("        predicatesRows += '<tr><td>' + k + '</td><td><span class=\"type-badge ' + (v || 'string') + '\">' + (v || 'string') + '</span></td></tr>';\n");
         builder.append("      }\n");
         builder.append("    }\n");
-        builder.append("    setActiveAnchor(current.id);\n");
-        builder.append("  };\n");
+        builder.append("    const wildcardsHtml = (event.wildcards || []).map(w => '<li class=\"wildcard-item\">' + w + '</li>').join('');\n");
+        builder.append("    const badges = '<span class=\"event-category-badge\">' + event.category + '</span>' + (sub ? '<span class=\"event-subcategory-badge\">' + sub + '</span>' : '');\n");
+        builder.append("    const html = '<div class=\"event-detail\"><div class=\"event-detail-header\"><div class=\"event-name\">' + event.event + '</div><div class=\"event-badges\">' + badges + '</div><div class=\"event-description\">' + (event.description || '') + '</div></div>' + (predicatesRows ? '<div class=\"section\"><h2 class=\"section-heading\">Predicates</h2><table class=\"predicates-table\"><thead><tr><th>Predicate Key</th><th>Type</th></tr></thead><tbody>' + predicatesRows + '</tbody></table></div>' : '') + (wildcardsHtml ? '<div class=\"section\"><h2 class=\"section-heading\">Wildcards</h2><ul class=\"wildcards-list\">' + wildcardsHtml + '</ul></div>' : '') + '</div>';\n");
+        builder.append("    const detailPanel = document.getElementById('eventDetailPanel');\n");
+        builder.append("    if (detailPanel) { detailPanel.innerHTML = html; detailPanel.classList.add('active'); }\n");
+        builder.append("    showPanel('eventDetail');\n");
+        builder.append("    document.querySelectorAll('.event-link').forEach(link => { link.classList.toggle('active', link.getAttribute('data-event-key') === event.event); });\n");
+        builder.append("  }\n");
+        builder.append("  function getSubcategory(e) { const p = (e.event || '').split('.'); return p.length >= 2 ? p[1] : null; }\n");
         builder.append("\n");
-        builder.append("  const updateSearch = () => {\n");
-        builder.append("    const term = input ? input.value.trim().toLowerCase() : '';\n");
-        builder.append("    eventEntries.forEach(entry => {\n");
-        builder.append("      const hay = entry.getAttribute('data-search') || '';\n");
-        builder.append("      entry.style.display = hay.includes(term) ? '' : 'none';\n");
+        builder.append("  document.querySelectorAll('.nav-link').forEach(link => {\n");
+        builder.append("    link.addEventListener('click', () => {\n");
+        builder.append("      const section = link.getAttribute('data-section');\n");
+        builder.append("      if (!section) return;\n");
+        builder.append("      const titles = { 'welcome': 'All the Webhooks', 'quick-start': 'Quick start', 'event-keys': 'Event key hierarchy', 'message-structure': 'Message structure', 'conditions': 'Conditions', 'webhook-display-name': 'Webhook display name', 'regex': 'Regex' };\n");
+        builder.append("      breadcrumb.innerHTML = '<span class=\"breadcrumb-item active\">' + (titles[section] || section) + '</span>';\n");
+        builder.append("      headerTitle.textContent = titles[section] || section;\n");
+        builder.append("      headerMeta.textContent = '';\n");
+        builder.append("      showPanel(section);\n");
+        builder.append("      link.classList.add('active');\n");
         builder.append("    });\n");
-        builder.append("    navItems.forEach(item => {\n");
-        builder.append("      const hay = item.getAttribute('data-search') || '';\n");
-        builder.append("      item.style.display = hay.includes(term) ? '' : 'none';\n");
+        builder.append("  });\n");
+        builder.append("\n");
+        builder.append("  document.querySelectorAll('.event-link').forEach(link => {\n");
+        builder.append("    link.addEventListener('click', () => {\n");
+        builder.append("      const key = link.getAttribute('data-event-key');\n");
+        builder.append("      const event = eventByKey[key] || eventsData.find(e => e.event === key);\n");
+        builder.append("      if (event) showEvent(event);\n");
         builder.append("    });\n");
-        builder.append("    if (term.length > 0) {\n");
-        builder.append("      detailsNodes.forEach(details => {\n");
-        builder.append("        const hasVisibleChild = Array.from(details.querySelectorAll('.nav-item'))\n");
-        builder.append("          .some(item => item.style.display !== 'none');\n");
-        builder.append("        details.open = hasVisibleChild;\n");
+        builder.append("  });\n");
+        builder.append("\n");
+        builder.append("  ['events', 'sub-events'].forEach(sectionId => {\n");
+        builder.append("    const searchEl = document.querySelector('.' + sectionId + '-search');\n");
+        builder.append("    const navEl = document.getElementById(sectionId + 'Nav');\n");
+        builder.append("    const expandBtn = document.querySelector('.' + sectionId + '-expand');\n");
+        builder.append("    const collapseBtn = document.querySelector('.' + sectionId + '-collapse');\n");
+        builder.append("    if (searchEl && navEl) {\n");
+        builder.append("      searchEl.addEventListener('input', e => {\n");
+        builder.append("        const term = e.target.value.trim().toLowerCase();\n");
+        builder.append("        navEl.querySelectorAll('.event-link').forEach(link => {\n");
+        builder.append("          const key = link.getAttribute('data-event-key');\n");
+        builder.append("          const ev = eventByKey[key];\n");
+        builder.append("          const hay = (key + ' ' + (ev ? ev.description || '' : '')).toLowerCase();\n");
+        builder.append("          const match = !term || hay.includes(term);\n");
+        builder.append("          link.style.display = match ? '' : 'none';\n");
+        builder.append("        });\n");
+        builder.append("        navEl.querySelectorAll('.subcategory-group').forEach(grp => {\n");
+        builder.append("          const visible = grp.querySelectorAll('.event-link').length > 0 && Array.from(grp.querySelectorAll('.event-link')).some(l => l.style.display !== 'none');\n");
+        builder.append("          grp.style.display = visible ? '' : 'none';\n");
+        builder.append("        });\n");
+        builder.append("        navEl.querySelectorAll('.category-group').forEach(grp => {\n");
+        builder.append("          const visible = grp.querySelectorAll('.event-link').length > 0 && Array.from(grp.querySelectorAll('.event-link')).some(l => l.style.display !== 'none');\n");
+        builder.append("          grp.style.display = visible ? '' : 'none';\n");
+        builder.append("        });\n");
         builder.append("      });\n");
         builder.append("    }\n");
-        builder.append("    const hasResults = eventEntries.some(entry => entry.style.display !== 'none');\n");
-        builder.append("    if (noResults) {\n");
-        builder.append("      if (term.length > 0 && !hasResults) {\n");
-        builder.append("        noResults.textContent = `No events or predicates match \"${term}\".`;\n");
-        builder.append("        noResults.style.display = 'block';\n");
-        builder.append("      } else {\n");
-        builder.append("        noResults.style.display = 'none';\n");
-        builder.append("      }\n");
-        builder.append("    }\n");
-        builder.append("  };\n");
+        builder.append("    if (expandBtn && navEl) expandBtn.addEventListener('click', () => navEl.querySelectorAll('.category-group, .subcategory-group').forEach(el => el.classList.add('expanded')));\n");
+        builder.append("    if (collapseBtn && navEl) collapseBtn.addEventListener('click', () => navEl.querySelectorAll('.category-group, .subcategory-group').forEach(el => el.classList.remove('expanded')));\n");
+        builder.append("  });\n");
         builder.append("\n");
-        builder.append("  if (input) {\n");
-        builder.append("    input.addEventListener('input', updateSearch);\n");
-        builder.append("  }\n");
-        builder.append("  window.addEventListener('hashchange', () => {\n");
-        builder.append("    const hash = window.location.hash.slice(1);\n");
-        builder.append("    setActiveAnchor(hash);\n");
+        builder.append("  document.querySelectorAll('.category-header, .subcategory-header').forEach(header => {\n");
+        builder.append("    header.addEventListener('click', () => header.parentElement.classList.toggle('expanded'));\n");
         builder.append("  });\n");
-        builder.append("  if (content) {\n");
-        builder.append("    content.addEventListener('scroll', updateActiveOnScroll);\n");
-        builder.append("  }\n");
-        builder.append("  window.addEventListener('resize', () => {\n");
-        builder.append("    cachedOffsets = anchorOffsets();\n");
-        builder.append("    updateActiveOnScroll();\n");
-        builder.append("  });\n");
-        builder.append("  cachedOffsets = anchorOffsets();\n");
-        builder.append("  updateActiveOnScroll();\n");
-        builder.append("  updateSearch();\n");
+        builder.append("\n");
+        builder.append("  showPanel('welcome');\n");
+        builder.append("  document.querySelector('.nav-link[data-section=\"welcome\"]').classList.add('active');\n");
         builder.append("})();\n");
         return builder.toString();
     }
@@ -800,6 +937,10 @@ public class DocumentationGenerator {
             builder.append("{");
             builder.append("\"event\":\"").append(JsonEscaper.escape(event.getKey())).append("\",");
             builder.append("\"category\":\"").append(JsonEscaper.escape(event.getCategory())).append("\",");
+            String subcat = getSubcategory(event);
+            if (subcat != null) {
+                builder.append("\"subcategory\":\"").append(JsonEscaper.escape(subcat)).append("\",");
+            }
             if (event.isSubEvent() && event.getParentBaseKey() != null) {
                 builder.append("\"parent_base_key\":\"").append(JsonEscaper.escape(event.getParentBaseKey())).append("\",");
             }

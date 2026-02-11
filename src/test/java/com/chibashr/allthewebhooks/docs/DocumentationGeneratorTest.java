@@ -70,7 +70,7 @@ class DocumentationGeneratorTest {
         assertTrue(Files.isRegularFile(docsHtml));
         String content = Files.readString(docsHtml);
         assertTrue(content.contains("<!DOCTYPE html>"));
-        assertTrue(content.contains("<html>"));
+        assertTrue(content.contains("</html>"), "Should contain HTML structure");
         assertTrue(content.contains("All the Webhooks"));
         assertTrue(content.contains("message-structure") || content.contains("events.yaml"));
         assertTrue(content.contains("Overview") || content.contains("overview"));

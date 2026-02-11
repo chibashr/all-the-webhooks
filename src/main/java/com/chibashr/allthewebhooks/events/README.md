@@ -25,6 +25,10 @@ When a player dies or takes damage, the context builder emits the most specific 
 
 **EventDefinition metadata for sub-events:** Sub-events set `parentBaseKey` (the base event they inherit from). Use `isSubEvent()` and `getParentBaseKey()` to style or group them in documentation, so sub-events appear in compact form under their base without duplicating full entries.
 
+## Context enrichment
+
+Events with a World, Player, or Block in scope automatically get related fields via **context enrichment**. When `EventContext.setPlayer()` or `setWorld()` or `setBlock()` is called, the corresponding enricher populates fields like `world.environment`, `player.name`, `block.type`, etc. Scope is derived from the event key (e.g. `player.death` → player, world; `player.break.block` → player, world, block). See `enrichment` package.
+
 ## Event rule nesting
 
 `events.yaml` supports nested sections, but only leaf sections that contain rule fields (`message`, `webhook`, `enabled`, `require-permission`, `conditions`, `rate-limit`) are registered as rules. This prevents parent grouping nodes (like `events.player`) from matching every `player.*` event when only `events.player.join` is intended.

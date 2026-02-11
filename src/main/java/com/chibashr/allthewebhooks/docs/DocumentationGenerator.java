@@ -1,5 +1,6 @@
 package com.chibashr.allthewebhooks.docs;
 
+import com.chibashr.allthewebhooks.enrichment.EntityFieldRegistry;
 import com.chibashr.allthewebhooks.events.EventDefinition;
 import com.chibashr.allthewebhooks.events.EventRegistry;
 import com.chibashr.allthewebhooks.util.AsyncExecutor;
@@ -124,6 +125,7 @@ public class DocumentationGenerator {
         builder.append("<div class=\"nav-link\" data-section=\"conditions\">Conditions</div>\n");
         builder.append("<div class=\"nav-link\" data-section=\"webhook-display-name\">Webhook display name</div>\n");
         builder.append("<div class=\"nav-link\" data-section=\"regex\">Regex</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"entity-reference\">Entity field reference</div>\n");
         builder.append("</div>\n");
         builder.append("</div>\n");
         builder.append("<div class=\"sidebar-events-block\">\n");
@@ -252,6 +254,9 @@ public class DocumentationGenerator {
         builder.append("<div id=\"regexPanel\" class=\"panel\"><div id=\"regex\" data-anchor=\"regex\">\n");
         builder.append(innerContent(buildPlaceholderRegexSpecSection()));
         builder.append("</div></div>\n");
+        builder.append("<div id=\"entity-referencePanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildEntityReferenceSection()));
+        builder.append("</div>\n");
         builder.append("<div id=\"eventDetailPanel\" class=\"panel\"></div>\n");
         builder.append("<script>window.__eventsData=").append(buildEventsJson(events)).append(";</script>\n");
         return builder.toString();
@@ -320,7 +325,7 @@ public class DocumentationGenerator {
         builder.append("<li><strong>Configure a webhook</strong> in <code>config.yaml</code> under <code>webhooks</code>.</li>\n");
         builder.append("<li><strong>Choose an event</strong> from the <a class=\"inline-link\" href=\"#events\">Events</a> section (e.g. <code>player.death</code>, <code>player.join</code>).</li>\n");
         builder.append("<li><strong>Add a rule</strong> in <code>events.yaml</code> under <code>events</code> with <code>message</code> and optional <code>conditions</code>.</li>\n");
-        builder.append("<li><strong>Define the message</strong> in <code>messages.yaml</code> using placeholders from the event's predicates.</li>\n");
+        builder.append("<li><strong>Define the message</strong> in <code>messages.yaml</code> using placeholders from the event's predicates (including context-enriched fields like <code>{world.environment}</code>).</li>\n");
         builder.append("</ol>\n");
         builder.append("<div class=\"example-block\">\n");
         builder.append("<div class=\"example-title\">Example: notify on player death</div>\n");
@@ -359,7 +364,9 @@ public class DocumentationGenerator {
         StringBuilder builder = new StringBuilder();
         builder.append("<section id=\"conditions\" class=\"doc-section\" data-anchor=\"conditions\">\n");
         builder.append("<h1>Conditions</h1>\n");
-        builder.append("<p>Add <code>conditions</code> to event rules to filter when the webhook fires. Each condition key must match a predicate from the event.</p>\n");
+        builder.append("<p>Add <code>conditions</code> to event rules to filter when the webhook fires. Each condition key must match a predicate from the event. ");
+        builder.append("Predicates include event-specific fields and <strong>context-enriched</strong> fields (e.g. <code>world.environment</code> for deaths in the Nether). ");
+        builder.append("See <a class=\"inline-link\" href=\"#entity-reference\">Entity field reference</a> and each event's predicates for what is available.</p>\n");
         builder.append("<h3>Available operators</h3>\n");
         builder.append("<ul>\n");
         builder.append("<li><code>equals</code> — exact match (string or number)</li>\n");
@@ -375,6 +382,10 @@ public class DocumentationGenerator {
         builder.append("<div class=\"example-title\">Example: exclude fall damage</div>\n");
         builder.append("<pre>events:\n  entity.damage.player:\n    message: player_damaged\n    conditions:\n      damage.cause:\n        not:\n          - FALL\n          - FALLING_BLOCK</pre>\n");
         builder.append("</div>\n");
+        builder.append("<div class=\"example-block\">\n");
+        builder.append("<div class=\"example-title\">Example: only deaths in the Nether</div>\n");
+        builder.append("<pre>events:\n  player.death:\n    message: nether_death\n    conditions:\n      world.environment:\n        equals: NETHER</pre>\n");
+        builder.append("</div>\n");
         builder.append("</section>\n");
         return builder.toString();
     }
@@ -386,6 +397,10 @@ public class DocumentationGenerator {
         builder.append("<p>Event rules set <code>message: &lt;key&gt;</code>; that key is looked up in <code>messages.yaml</code>. ");
         builder.append("The <code>content</code> template uses placeholders like <code>{player.name}</code> — each event's ");
         builder.append("<a class=\"inline-link\" href=\"#events\">predicates</a> can be used as placeholders. ");
+        builder.append("Predicates include event-specific fields (e.g. <code>death.message</code>, <code>damage.amount</code>) plus ");
+        builder.append("<strong>context-enriched</strong> fields from entities in scope: when an event has a World, Player, or Block, ");
+        builder.append("fields like <code>{world.environment}</code>, <code>{player.name}</code>, <code>{block.type}</code> are available automatically. ");
+        builder.append("See <a class=\"inline-link\" href=\"#entity-reference\">Entity field reference</a> for the full list. ");
         builder.append("Optional <code>username</code> per message sets the webhook display name; see <a class=\"inline-link\" href=\"#webhook-display-name\">Webhook display name</a>.</p>\n");
         builder.append("<div class=\"example-block\">\n");
         builder.append("<div class=\"example-title\">Example</div>\n");
@@ -472,6 +487,33 @@ public class DocumentationGenerator {
         builder.append("<h3>Security</h3>\n");
         builder.append("<p>Regex runs with a 300 ms timeout in a single-thread executor. On timeout, <code>PatternSyntaxException</code>, or any other exception, the resolver uses the untransformed value and logs a one-time warning per placeholder key.</p>\n");
 
+        builder.append("</section>\n");
+        return builder.toString();
+    }
+
+    private String buildEntityReferenceSection() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<section id=\"entity-reference\" class=\"doc-section\" data-anchor=\"entity-reference\">\n");
+        builder.append("<h1>Entity field reference</h1>\n");
+        builder.append("<p class=\"meta\">Events with a World, Player, or Block in scope automatically have these fields available via ");
+        builder.append("<strong>context enrichment</strong>. Use them in conditions and message placeholders.</p>\n");
+        for (String entityType : EntityFieldRegistry.getEntityTypes()) {
+            String id = "entity-" + entityType;
+            builder.append("<div id=\"").append(id).append("\" class=\"entity-ref-section\">\n");
+            builder.append("<h2>").append(entityType.substring(0, 1).toUpperCase()).append(entityType.substring(1)).append("</h2>\n");
+            builder.append("<p class=\"meta\">Available when an event has a ").append(entityType).append(" in scope (e.g. player events, block events).</p>\n");
+            Map<String, String> spec = EntityFieldRegistry.getFieldSpec(entityType);
+            if (!spec.isEmpty()) {
+                builder.append("<table class=\"predicates-table\"><thead><tr><th>Field</th><th>Type</th></tr></thead><tbody>\n");
+                for (Map.Entry<String, String> e : spec.entrySet()) {
+                    builder.append("<tr><td><code>").append(HtmlEscaper.escape(e.getKey())).append("</code></td>");
+                    builder.append("<td><span class=\"type-badge ").append(HtmlEscaper.escape(e.getValue())).append("\">")
+                            .append(HtmlEscaper.escape(e.getValue())).append("</span></td></tr>\n");
+                }
+                builder.append("</tbody></table>\n");
+            }
+            builder.append("</div>\n");
+        }
         builder.append("</section>\n");
         return builder.toString();
     }
@@ -700,6 +742,8 @@ public class DocumentationGenerator {
         builder.append(".example-block { margin-top: 16px; padding: 16px; background: #252525; border-radius: 4px; border: 1px solid #404040; }\n");
         builder.append(".example-title { font-weight: 600; margin-bottom: 8px; }\n");
         builder.append(".predicate-list li { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; padding: 4px 0; }\n");
+        builder.append(".entity-ref-section { margin-top: 32px; padding-top: 24px; border-top: 1px solid #404040; }\n");
+        builder.append(".entity-ref-section:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }\n");
         builder.append("::-webkit-scrollbar { width: 8px; height: 8px; }\n");
         builder.append("::-webkit-scrollbar-track { background: #1a1a1a; }\n");
         builder.append("::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }\n");
@@ -751,6 +795,9 @@ public class DocumentationGenerator {
         builder.append("      const subCount = eventsData.filter(e => e.parent_base_key === event.event).length;\n");
         builder.append("      if (subCount > 0) linksHtml += '<div class=\"event-relation-links\"><a href=\"#\" class=\"event-relation-link\" data-filter-parent=\"' + event.event + '\">View sub-events (' + subCount + ')</a></div>';\n");
         builder.append("    }\n");
+        builder.append("    if (event.enriched_from && event.enriched_from.length > 0) {\n");
+        builder.append("      linksHtml += '<div class=\"event-relation-links\"><span class=\"meta\">Context enriched from: </span>' + event.enriched_from.map(e => '<a href=\"#\" class=\"event-relation-link\" data-section=\"entity-reference\" data-entity=\"' + e + '\">' + e + '</a>').join(', ') + '</div>';\n");
+        builder.append("    }\n");
         builder.append("    const html = '<div class=\"event-detail\"><div class=\"event-detail-header\"><div class=\"event-name\">' + event.event + '</div><div class=\"event-badges\">' + badges + '</div>' + linksHtml + '<div class=\"event-description\">' + (event.description || '') + '</div></div>' + (predicatesRows ? '<div class=\"section\"><h2 class=\"section-heading\">Predicates</h2><table class=\"predicates-table\"><thead><tr><th>Predicate Key</th><th>Type</th></tr></thead><tbody>' + predicatesRows + '</tbody></table></div>' : '') + (wildcardsHtml ? '<div class=\"section\"><h2 class=\"section-heading\">Wildcards</h2><ul class=\"wildcards-list\">' + wildcardsHtml + '</ul></div>' : '') + '</div>';\n");
         builder.append("    const detailPanel = document.getElementById('eventDetailPanel');\n");
         builder.append("    if (detailPanel) { detailPanel.innerHTML = html; detailPanel.classList.add('active'); }\n");
@@ -778,15 +825,23 @@ public class DocumentationGenerator {
         builder.append("    }\n");
         builder.append("    const key = link.getAttribute('data-event-key');\n");
         builder.append("    const filterParent = link.getAttribute('data-filter-parent');\n");
+        builder.append("    const section = link.getAttribute('data-section');\n");
+        builder.append("    const entity = link.getAttribute('data-entity');\n");
         builder.append("    if (key) { const ev = eventByKey[key]; if (ev) showEvent(ev); }\n");
         builder.append("    else if (filterParent) showSubEventsForParent(filterParent);\n");
+        builder.append("    else if (section === 'entity-reference' && entity) {\n");
+        builder.append("      document.querySelector('.nav-link[data-section=\"entity-reference\"]')?.classList.add('active');\n");
+        builder.append("      showPanel('entity-reference');\n");
+        builder.append("      const el = document.getElementById('entity-' + entity);\n");
+        builder.append("      if (el) el.scrollIntoView({ behavior: 'smooth' });\n");
+        builder.append("    }\n");
         builder.append("  });\n");
         builder.append("\n");
         builder.append("  document.querySelectorAll('.nav-link').forEach(link => {\n");
         builder.append("    link.addEventListener('click', () => {\n");
         builder.append("      const section = link.getAttribute('data-section');\n");
         builder.append("      if (!section) return;\n");
-        builder.append("      const titles = { 'welcome': 'All the Webhooks', 'quick-start': 'Quick start', 'event-keys': 'Event key hierarchy', 'message-structure': 'Message structure', 'conditions': 'Conditions', 'webhook-display-name': 'Webhook display name', 'regex': 'Regex' };\n");
+        builder.append("      const titles = { 'welcome': 'All the Webhooks', 'quick-start': 'Quick start', 'event-keys': 'Event key hierarchy', 'message-structure': 'Message structure', 'conditions': 'Conditions', 'webhook-display-name': 'Webhook display name', 'regex': 'Regex', 'entity-reference': 'Entity field reference' };\n");
         builder.append("      breadcrumb.innerHTML = '<span class=\"breadcrumb-item active\">' + (titles[section] || section) + '</span>';\n");
         builder.append("      headerTitle.textContent = titles[section] || section;\n");
         builder.append("      headerMeta.textContent = '';\n");
@@ -1041,9 +1096,10 @@ public class DocumentationGenerator {
                 builder.append("\"parent_base_key\":\"").append(JsonEscaper.escape(event.getParentBaseKey())).append("\",");
             }
             builder.append("\"description\":\"").append(JsonEscaper.escape(event.getDescription())).append("\",");
+            Map<String, String> effectivePredicates = event.getEffectivePredicateFields();
             builder.append("\"predicates\":{");
             boolean firstPredicate = true;
-            for (Map.Entry<String, String> entry : event.getPredicateFields().entrySet()) {
+            for (Map.Entry<String, String> entry : effectivePredicates.entrySet()) {
                 if (!firstPredicate) {
                     builder.append(",");
                 }
@@ -1052,6 +1108,13 @@ public class DocumentationGenerator {
                         .append(JsonEscaper.escape(entry.getValue())).append("\"");
             }
             builder.append("},");
+            List<String> enrichedFrom = event.getEnrichedFrom();
+            builder.append("\"enriched_from\":[");
+            for (int i = 0; i < enrichedFrom.size(); i++) {
+                if (i > 0) builder.append(",");
+                builder.append("\"").append(JsonEscaper.escape(enrichedFrom.get(i))).append("\"");
+            }
+            builder.append("],");
             builder.append("\"wildcards\":[");
             boolean firstWildcard = true;
             for (String example : event.getWildcardExamples()) {

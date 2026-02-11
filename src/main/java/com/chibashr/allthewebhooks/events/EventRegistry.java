@@ -2,7 +2,6 @@ package com.chibashr.allthewebhooks.events;
 
 import com.chibashr.allthewebhooks.config.EventConfig;
 import com.chibashr.allthewebhooks.config.EventKeyMatcher;
-import com.chibashr.allthewebhooks.util.LocationFormatter;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -40,21 +39,12 @@ public class EventRegistry {
                 "player.join",
                 "player",
                 "Fired when a player joins the server.",
-                Map.of(
-                        "player.name", "string",
-                        "player.uuid", "uuid",
-                        "world.name", "string"
-                ),
+                Map.of(),
                 List.of("player.join.*"),
                 "player.join:\n  message: player_join",
                 (PlayerJoinEvent event) -> {
                     EventContext context = new EventContext("player.join");
-                    Player player = event.getPlayer();
-                    context.setPlayer(player);
-                    context.setWorld(player.getWorld());
-                    context.put("player.name", player.getName());
-                    context.put("player.uuid", player.getUniqueId().toString());
-                    context.put("world.name", player.getWorld().getName());
+                    context.setPlayer(event.getPlayer());
                     return context;
                 }
         ));
@@ -63,21 +53,12 @@ public class EventRegistry {
                 "player.quit",
                 "player",
                 "Fired when a player leaves the server.",
-                Map.of(
-                        "player.name", "string",
-                        "player.uuid", "uuid",
-                        "world.name", "string"
-                ),
+                Map.of(),
                 List.of("player.quit.*"),
                 "player.quit:\n  message: player_quit",
                 (PlayerQuitEvent event) -> {
                     EventContext context = new EventContext("player.quit");
-                    Player player = event.getPlayer();
-                    context.setPlayer(player);
-                    context.setWorld(player.getWorld());
-                    context.put("player.name", player.getName());
-                    context.put("player.uuid", player.getUniqueId().toString());
-                    context.put("world.name", player.getWorld().getName());
+                    context.setPlayer(event.getPlayer());
                     return context;
                 }
         ));
@@ -86,23 +67,13 @@ public class EventRegistry {
                 "player.chat",
                 "player",
                 "Fired when a player sends a chat message.",
-                Map.of(
-                        "player.name", "string",
-                        "player.uuid", "uuid",
-                        "chat.message", "string",
-                        "world.name", "string"
-                ),
+                Map.of("chat.message", "string"),
                 List.of("player.chat.*"),
                 "player.chat:\n  message: generic",
                 (AsyncPlayerChatEvent event) -> {
                     EventContext context = new EventContext("player.chat");
-                    Player player = event.getPlayer();
-                    context.setPlayer(player);
-                    context.setWorld(player.getWorld());
-                    context.put("player.name", player.getName());
-                    context.put("player.uuid", player.getUniqueId().toString());
+                    context.setPlayer(event.getPlayer());
                     context.put("chat.message", event.getMessage());
-                    context.put("world.name", player.getWorld().getName());
                     return context;
                 }
         ));
@@ -111,23 +82,13 @@ public class EventRegistry {
                 "player.command",
                 "player",
                 "Fired when a player runs a command.",
-                Map.of(
-                        "player.name", "string",
-                        "player.uuid", "uuid",
-                        "command.raw", "string",
-                        "world.name", "string"
-                ),
+                Map.of("command.raw", "string"),
                 List.of("player.command.*"),
                 "player.command:\n  message: generic",
                 (PlayerCommandPreprocessEvent event) -> {
                     EventContext context = new EventContext("player.command");
-                    Player player = event.getPlayer();
-                    context.setPlayer(player);
-                    context.setWorld(player.getWorld());
-                    context.put("player.name", player.getName());
-                    context.put("player.uuid", player.getUniqueId().toString());
+                    context.setPlayer(event.getPlayer());
                     context.put("command.raw", event.getMessage());
-                    context.put("world.name", player.getWorld().getName());
                     return context;
                 }
         ));
@@ -137,9 +98,6 @@ public class EventRegistry {
                 "player",
                 "Fired when a player dies.",
                 Map.of(
-                        "player.name", "string",
-                        "player.uuid", "uuid",
-                        "world.name", "string",
                         "death.message", "string",
                         "death.message.key", "string"
                 ),
@@ -148,12 +106,7 @@ public class EventRegistry {
                 (PlayerDeathEvent event) -> {
                     String eventKey = DeathMessageKeyResolver.buildPlayerDeathEventKey(event);
                     EventContext context = new EventContext(eventKey);
-                    Player player = event.getEntity();
-                    context.setPlayer(player);
-                    context.setWorld(player.getWorld());
-                    context.put("player.name", player.getName());
-                    context.put("player.uuid", player.getUniqueId().toString());
-                    context.put("world.name", player.getWorld().getName());
+                    context.setPlayer(event.getEntity());
                     context.put("death.message", event.getDeathMessage() != null ? event.getDeathMessage() : "");
                     context.put("death.message.key", DeathMessageKeyResolver.resolveFullMinecraftKey(event));
                     return context;
@@ -164,27 +117,13 @@ public class EventRegistry {
                 "player.break.block",
                 "player",
                 "Fired when a player breaks a block.",
-                Map.of(
-                        "player.name", "string",
-                        "player.uuid", "uuid",
-                        "player.gamemode", "string",
-                        "block.type", "string",
-                        "block.location", "string",
-                        "world.name", "string"
-                ),
+                Map.of(),
                 List.of("player.break.block.*", "player.break.block.<material>"),
                 "player.break.block:\n  message: block_break\n  conditions:\n    block.type:\n      equals: DIAMOND_ORE",
                 (BlockBreakEvent event) -> {
                     EventContext context = new EventContext("player.break.block");
-                    Player player = event.getPlayer();
-                    context.setPlayer(player);
-                    context.setWorld(player.getWorld());
-                    context.put("player.name", player.getName());
-                    context.put("player.uuid", player.getUniqueId().toString());
-                    context.put("player.gamemode", player.getGameMode().name());
-                    context.put("block.type", event.getBlock().getType().name());
-                    context.put("block.location", LocationFormatter.format(event.getBlock().getLocation()));
-                    context.put("world.name", player.getWorld().getName());
+                    context.setPlayer(event.getPlayer());
+                    context.setBlock(event.getBlock());
                     return context;
                 }
         ));
@@ -193,27 +132,13 @@ public class EventRegistry {
                 "player.place.block",
                 "player",
                 "Fired when a player places a block.",
-                Map.of(
-                        "player.name", "string",
-                        "player.uuid", "uuid",
-                        "player.gamemode", "string",
-                        "block.type", "string",
-                        "block.location", "string",
-                        "world.name", "string"
-                ),
+                Map.of(),
                 List.of("player.place.block.*", "player.place.block.<material>"),
                 "player.place.block:\n  message: generic",
                 (BlockPlaceEvent event) -> {
                     EventContext context = new EventContext("player.place.block");
-                    Player player = event.getPlayer();
-                    context.setPlayer(player);
-                    context.setWorld(player.getWorld());
-                    context.put("player.name", player.getName());
-                    context.put("player.uuid", player.getUniqueId().toString());
-                    context.put("player.gamemode", player.getGameMode().name());
-                    context.put("block.type", event.getBlockPlaced().getType().name());
-                    context.put("block.location", LocationFormatter.format(event.getBlockPlaced().getLocation()));
-                    context.put("world.name", player.getWorld().getName());
+                    context.setPlayer(event.getPlayer());
+                    context.setBlock(event.getBlockPlaced());
                     return context;
                 }
         ));
@@ -223,11 +148,8 @@ public class EventRegistry {
                 "entity",
                 "Fired when a player is damaged.",
                 Map.of(
-                        "player.name", "string",
-                        "player.uuid", "uuid",
                         "damage.amount", "number",
-                        "damage.cause", "string",
-                        "world.name", "string"
+                        "damage.cause", "string"
                 ),
                 List.of("entity.damage.*", "entity.damage.player.*"),
                 "entity.damage.player:\n  message: player_damaged",
@@ -239,12 +161,8 @@ public class EventRegistry {
                     String eventKey = "entity.damage.player." + causeKey;
                     EventContext context = new EventContext(eventKey);
                     context.setPlayer(player);
-                    context.setWorld(player.getWorld());
-                    context.put("player.name", player.getName());
-                    context.put("player.uuid", player.getUniqueId().toString());
                     context.put("damage.amount", event.getFinalDamage());
                     context.put("damage.cause", event.getCause().name());
-                    context.put("world.name", player.getWorld().getName());
                     return context;
                 }
         ));
@@ -253,12 +171,7 @@ public class EventRegistry {
                 "inventory.open",
                 "inventory",
                 "Fired when a player opens an inventory.",
-                Map.of(
-                        "player.name", "string",
-                        "player.uuid", "uuid",
-                        "inventory.type", "string",
-                        "world.name", "string"
-                ),
+                Map.of("inventory.type", "string"),
                 List.of("inventory.open.*"),
                 "inventory.open:\n  message: generic",
                 (InventoryOpenEvent event) -> {
@@ -267,11 +180,7 @@ public class EventRegistry {
                     }
                     EventContext context = new EventContext("inventory.open");
                     context.setPlayer(player);
-                    context.setWorld(player.getWorld());
-                    context.put("player.name", player.getName());
-                    context.put("player.uuid", player.getUniqueId().toString());
                     context.put("inventory.type", event.getInventory().getType().name());
-                    context.put("world.name", player.getWorld().getName());
                     return context;
                 }
         ));
@@ -280,18 +189,12 @@ public class EventRegistry {
                 "world.time.change",
                 "world",
                 "Fired when the world time changes via a time skip.",
-                Map.of(
-                        "world.name", "string",
-                        "world.time", "number",
-                        "world.skip.reason", "string"
-                ),
+                Map.of("world.skip.reason", "string"),
                 List.of("world.time.*"),
                 "world.time.change:\n  message: generic",
                 (TimeSkipEvent event) -> {
                     EventContext context = new EventContext("world.time.change");
                     context.setWorld(event.getWorld());
-                    context.put("world.name", event.getWorld().getName());
-                    context.put("world.time", event.getWorld().getTime());
                     context.put("world.skip.reason", event.getSkipReason().name());
                     return context;
                 }
@@ -301,34 +204,12 @@ public class EventRegistry {
                 "world.load",
                 "world",
                 "Fired when a world is loaded or created.",
-                Map.of(
-                        "world.name", "string",
-                        "world.seed", "number",
-                        "world.environment", "string",
-                        "world.difficulty", "string",
-                        "world.min_height", "number",
-                        "world.max_height", "number",
-                        "world.hardcore", "boolean",
-                        "world.spawn_location", "string",
-                        "world.structures", "boolean",
-                        "world.folder", "string"
-                ),
+                Map.of(),
                 List.of("world.load.*"),
                 "world.load:\n  message: generic",
                 (WorldLoadEvent event) -> {
-                    World w = event.getWorld();
                     EventContext context = new EventContext("world.load");
-                    context.setWorld(w);
-                    context.put("world.name", w.getName());
-                    context.put("world.seed", w.getSeed());
-                    context.put("world.environment", w.getEnvironment().name());
-                    context.put("world.difficulty", w.getDifficulty().name());
-                    context.put("world.min_height", w.getMinHeight());
-                    context.put("world.max_height", w.getMaxHeight());
-                    context.put("world.hardcore", w.isHardcore());
-                    context.put("world.spawn_location", LocationFormatter.format(w.getSpawnLocation()));
-                    context.put("world.structures", w.canGenerateStructures());
-                    context.put("world.folder", w.getWorldFolder().getName());
+                    context.setWorld(event.getWorld());
                     return context;
                 }
         ));
@@ -423,13 +304,8 @@ public class EventRegistry {
         World world = player != null ? player.getWorld() : (server.getWorlds().isEmpty() ? null : server.getWorlds().get(0));
         if (player != null) {
             ctx.setPlayer(player);
-            ctx.setWorld(player.getWorld());
-            ctx.put("player.name", player.getName());
-            ctx.put("player.uuid", player.getUniqueId().toString());
-            ctx.put("world.name", player.getWorld().getName());
         } else if (world != null) {
             ctx.setWorld(world);
-            ctx.put("world.name", world.getName());
         }
 
         if (eventKey.equals("player.chat") || eventKey.startsWith("player.chat.")) {
@@ -447,15 +323,13 @@ public class EventRegistry {
             return ctx;
         }
         if (eventKey.equals("player.break.block") || eventKey.startsWith("player.break.block.")) {
-            ctx.put("player.gamemode", player != null ? player.getGameMode().name() : "SURVIVAL");
             ctx.put("block.type", "STONE");
-            ctx.put("block.location", world != null ? "0,0,0," + world.getName() : "0,0,0");
+            ctx.put("block.location", world != null ? "0,0,0" : "0,0,0");
             return ctx;
         }
         if (eventKey.equals("player.place.block") || eventKey.startsWith("player.place.block.")) {
-            ctx.put("player.gamemode", player != null ? player.getGameMode().name() : "SURVIVAL");
             ctx.put("block.type", "STONE");
-            ctx.put("block.location", world != null ? "0,0,0," + world.getName() : "0,0,0");
+            ctx.put("block.location", world != null ? "0,0,0" : "0,0,0");
             return ctx;
         }
         if (eventKey.equals("entity.damage.player") || eventKey.startsWith("entity.damage.")) {
@@ -469,22 +343,12 @@ public class EventRegistry {
             return ctx;
         }
         if (eventKey.equals("world.time.change") || eventKey.startsWith("world.time.")) {
-            ctx.put("world.time", world != null ? world.getTime() : 0L);
             ctx.put("world.skip.reason", "CUSTOM");
             return ctx;
         }
         if (eventKey.equals("world.load") || eventKey.startsWith("world.load.")) {
-            if (world != null) {
-                ctx.put("world.seed", world.getSeed());
-                ctx.put("world.environment", world.getEnvironment().name());
-                ctx.put("world.difficulty", world.getDifficulty().name());
-                ctx.put("world.min_height", world.getMinHeight());
-                ctx.put("world.max_height", world.getMaxHeight());
-                ctx.put("world.hardcore", world.isHardcore());
-                ctx.put("world.spawn_location", LocationFormatter.format(world.getSpawnLocation()));
-                ctx.put("world.structures", world.canGenerateStructures());
-                ctx.put("world.folder", world.getWorldFolder().getName());
-            } else {
+            if (world == null) {
+                ctx.put("world.name", "");
                 ctx.put("world.seed", 0L);
                 ctx.put("world.environment", "NORMAL");
                 ctx.put("world.difficulty", "NORMAL");
@@ -494,6 +358,7 @@ public class EventRegistry {
                 ctx.put("world.spawn_location", "0,0,0");
                 ctx.put("world.structures", true);
                 ctx.put("world.folder", "");
+                ctx.put("world.time", 0L);
             }
             return ctx;
         }
@@ -535,16 +400,6 @@ public class EventRegistry {
         }
         EventContext context = new EventContext("world.load");
         context.setWorld(world);
-        context.put("world.name", world.getName());
-        context.put("world.seed", world.getSeed());
-        context.put("world.environment", world.getEnvironment().name());
-        context.put("world.difficulty", world.getDifficulty().name());
-        context.put("world.min_height", world.getMinHeight());
-        context.put("world.max_height", world.getMaxHeight());
-        context.put("world.hardcore", world.isHardcore());
-        context.put("world.spawn_location", LocationFormatter.format(world.getSpawnLocation()));
-        context.put("world.structures", world.canGenerateStructures());
-        context.put("world.folder", world.getWorldFolder().getName());
         return context;
     }
 
@@ -559,10 +414,6 @@ public class EventRegistry {
         }
         EventContext context = new EventContext("player.join");
         context.setPlayer(player);
-        context.setWorld(player.getWorld());
-        context.put("player.name", player.getName());
-        context.put("player.uuid", player.getUniqueId().toString());
-        context.put("world.name", player.getWorld().getName());
         return context;
     }
 

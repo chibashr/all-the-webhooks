@@ -134,7 +134,6 @@ public class AdminCommand implements CommandExecutor {
             context = new EventContext(eventKey);
             if (sender instanceof Player player) {
                 context.setPlayer(player);
-                context.setWorld(player.getWorld());
             }
             for (String pair : pairs) {
                 int eq = pair.indexOf('=');

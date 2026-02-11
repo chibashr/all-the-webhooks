@@ -1,5 +1,8 @@
 package com.chibashr.allthewebhooks.events;
 
+import com.chibashr.allthewebhooks.enrichment.EntityFieldRegistry;
+import com.chibashr.allthewebhooks.enrichment.ScopeDerivation;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -81,5 +84,26 @@ public class EventDefinition {
 
     public EventContextBuilder<?> getContextBuilder() {
         return contextBuilder;
+    }
+
+    /**
+     * Entity types in scope for this event (derived from key, or parent for sub-events).
+     * Used for context enrichment and documentation.
+     */
+    public List<String> getEnrichedFrom() {
+        String keyToUse = parentBaseKey != null ? parentBaseKey : key;
+        return ScopeDerivation.deriveEnrichedFrom(keyToUse);
+    }
+
+    /**
+     * Effective predicate fields = event-specific + enriched entity fields.
+     * Use for documentation and validation.
+     */
+    public Map<String, String> getEffectivePredicateFields() {
+        Map<String, String> effective = new LinkedHashMap<>(predicateFields);
+        for (String entityType : getEnrichedFrom()) {
+            effective.putAll(EntityFieldRegistry.getFieldSpec(entityType));
+        }
+        return Map.copyOf(effective);
     }
 }

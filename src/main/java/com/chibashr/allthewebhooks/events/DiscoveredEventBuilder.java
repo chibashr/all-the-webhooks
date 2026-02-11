@@ -79,6 +79,9 @@ final class DiscoveredEventBuilder {
                 if (value instanceof World world) {
                     ctx.setWorld(world);
                 }
+                if (value instanceof Block block) {
+                    ctx.setBlock(block);
+                }
             }
             return ctx;
         };

@@ -764,6 +764,8 @@ public class DocumentationGenerator {
         builder.append("    if (filterEl) { filterEl.value = parentKey; applySubEventsFilter(); }\n");
         builder.append("    const searchEl = document.querySelector('.sub-events-search');\n");
         builder.append("    if (searchEl) { searchEl.value = ''; }\n");
+        builder.append("    const subNav = document.getElementById('sub-eventsNav');\n");
+        builder.append("    if (subNav) { subNav.querySelectorAll('.category-group, .subcategory-group').forEach(g => { if (Array.from(g.querySelectorAll('.event-link')).some(l => l.style.display !== 'none')) g.classList.add('expanded'); }); }\n");
         builder.append("  }\n");
         builder.append("\n");
         builder.append("  document.body.addEventListener('click', e => {\n");
@@ -806,7 +808,7 @@ public class DocumentationGenerator {
         builder.append("    const parentFilter = (document.getElementById('subEventsParentFilter')?.value || '').trim();\n");
         builder.append("    const ind = document.getElementById('subEventsFilterIndicator');\n");
         builder.append("    if (ind) ind.innerHTML = parentFilter ? '<span class=\"meta\">Filtering by parent: <code>' + parentFilter + '</code> <a href=\"#\" class=\"event-relation-link\" data-clear-parent-filter>clear</a></span>' : '';\n");
-        builder.append("    const navEl = document.getElementById('subEventsNav');\n");
+        builder.append("    const navEl = document.getElementById('sub-eventsNav');\n");
         builder.append("    if (!navEl) return;\n");
         builder.append("    navEl.querySelectorAll('.event-link').forEach(link => {\n");
         builder.append("      const key = link.getAttribute('data-event-key');\n");
@@ -866,6 +868,7 @@ public class DocumentationGenerator {
         builder.append("      tab.classList.add('active');\n");
         builder.append("      const panel = document.getElementById(id + 'TabPanel');\n");
         builder.append("      if (panel) panel.classList.add('active');\n");
+        builder.append("      if (id === 'sub-events') { applySubEventsFilter(); document.getElementById('sub-eventsNav')?.querySelectorAll('.category-group, .subcategory-group').forEach(el => el.classList.add('expanded')); }\n");
         builder.append("    });\n");
         builder.append("  });\n");
         builder.append("\n");

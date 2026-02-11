@@ -176,6 +176,8 @@ class DocumentationGeneratorTest {
         assertTrue(json.contains("parent_base_key"), "events.json should include parent_base_key for sub-events");
         Path docsHtml = dataFolder.resolve("docs").resolve("docs.html");
         assertTrue(Files.readString(docsHtml).contains("Sub-events"), "docs.html should have Sub-events tab");
+        String html = Files.readString(docsHtml);
+        assertTrue(html.contains("sub-eventsNav"), "docs.html should have sub-eventsNav element for filter/filtering");
     }
 
     @Test

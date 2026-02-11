@@ -22,6 +22,16 @@ The generated `docs.html` uses a two-panel layout:
 - **Category** = first segment of event key (e.g. `player`, `entity`)
 - **Subcategory** = second segment (e.g. `death`, `damage`)
 
+## Cross-Links
+
+- **Sub-events** show "Inherits from: [parent event]" with a clickable link to the base event.
+- **Base events** with sub-events show "View sub-events (N)" — clicking switches to the Sub-events tab and filters by that parent.
+- Parent filter can be cleared via the "clear" link in the Sub-events tab.
+
+## Offline
+
+Docs are generated after SubEventDiscovery runs at plugin startup. The output is standalone HTML with embedded JSON — no network or server required to view. Content reflects exactly what was scanned (Paper registries, Bukkit enums, config-derived keys).
+
 ## Files Generated
 
 - `docs/docs.html` – Single-page wiki-style documentation

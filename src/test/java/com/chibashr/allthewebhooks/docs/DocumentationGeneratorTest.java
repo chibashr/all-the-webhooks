@@ -1,6 +1,7 @@
 package com.chibashr.allthewebhooks.docs;
 
 import com.chibashr.allthewebhooks.events.EventRegistry;
+import com.chibashr.allthewebhooks.events.SubEventDiscovery;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,11 +12,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
+import java.util.logging.Logger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -50,6 +53,7 @@ class DocumentationGeneratorTest {
         when(plugin.getDescription()).thenReturn(description);
         when(description.getVersion()).thenReturn("0.1.0-test");
         when(plugin.getServer()).thenReturn(server);
+        lenient().when(plugin.getLogger()).thenReturn(Logger.getLogger("DocumentationGeneratorTest"));
         when(server.getVersion()).thenReturn("Paper 1.20.6");
     }
 
@@ -64,6 +68,7 @@ class DocumentationGeneratorTest {
     @Test
     void generate_producesDocsHtml() throws IOException {
         EventRegistry registry = EventRegistry.createDefault();
+        SubEventDiscovery.discover(server, registry, plugin.getLogger());
         DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);
         generator.generate();
         Path docsHtml = dataFolder.resolve("docs").resolve("docs.html");
@@ -143,6 +148,7 @@ class DocumentationGeneratorTest {
         when(server.getVersion()).thenReturn("Paper 1.20.6");
 
         EventRegistry registry = EventRegistry.createDefault();
+        SubEventDiscovery.discover(server, registry, plugin.getLogger());
         DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);
         generator.generate();
 
@@ -157,6 +163,19 @@ class DocumentationGeneratorTest {
         assertTrue(content.contains("entity.damage.player"));
         assertTrue(content.contains("inventory.open"));
         assertTrue(content.contains("world.time.change"));
+    }
+
+    @Test
+    void generate_includesSubEventsWhenDiscoveryRuns() throws IOException {
+        EventRegistry registry = EventRegistry.createDefault();
+        SubEventDiscovery.discover(server, registry, plugin.getLogger());
+        DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);
+        generator.generate();
+        Path eventsJson = dataFolder.resolve("docs").resolve("events.json");
+        String json = Files.readString(eventsJson);
+        assertTrue(json.contains("parent_base_key"), "events.json should include parent_base_key for sub-events");
+        Path docsHtml = dataFolder.resolve("docs").resolve("docs.html");
+        assertTrue(Files.readString(docsHtml).contains("Sub-events"), "docs.html should have Sub-events tab");
     }
 
     @Test

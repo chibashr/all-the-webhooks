@@ -137,6 +137,8 @@ public class DocumentationGenerator {
         builder.append(buildEventsNavSection(baseEvents, "events", "Search events..."));
         builder.append("</div>\n");
         builder.append("<div class=\"events-tab-panel\" id=\"subEventsTabPanel\">\n");
+        builder.append("<input type=\"hidden\" id=\"subEventsParentFilter\" value=\"\">\n");
+        builder.append("<div class=\"sub-events-filter-indicator\" id=\"subEventsFilterIndicator\"></div>\n");
         builder.append(buildEventsNavSection(subEvents, "sub-events", "Search sub-events..."));
         builder.append("</div>\n");
         builder.append("</div>\n");
@@ -342,20 +344,6 @@ public class DocumentationGenerator {
         builder.append("<li><code>player.death.attack.dryout.player</code> — matches only that exact death type.</li>\n");
         builder.append("<li><code>player.death.attack.*</code> — matches all attack-type deaths (cactus, lava, etc.).</li>\n");
         builder.append("<li><code>player.death</code> — matches any player death.</li>\n");
-        builder.append("</ul>\n");
-        builder.append("<h3>Event categories</h3>\n");
-        builder.append("<p>Events are grouped by category. Use the search box or sidebar to find events.</p>\n");
-        Map<String, Long> categoryCounts = new LinkedHashMap<>();
-        for (EventDefinition e : events) {
-            if (!e.isSubEvent()) {
-                categoryCounts.merge(e.getCategory(), 1L, Long::sum);
-            }
-        }
-        builder.append("<ul>\n");
-        for (Map.Entry<String, Long> entry : categoryCounts.entrySet()) {
-            builder.append("<li><strong>").append(HtmlEscaper.escape(entry.getKey())).append("</strong> — ")
-                    .append(entry.getValue()).append(" event(s)</li>\n");
-        }
         builder.append("</ul>\n");
         builder.append("<h3>Sub-events</h3>\n");
         builder.append("<p>Some events (e.g. <code>player.death</code>, <code>entity.damage.player</code>) have <strong>sub-events</strong> ");
@@ -683,8 +671,11 @@ public class DocumentationGenerator {
         builder.append(".event-category-badge { padding: 4px 10px; background: #3d5266; color: #4a9eff; font-size: 12px; ");
         builder.append("font-weight: 600; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.5px; }\n");
         builder.append(".event-subcategory-badge { padding: 4px 10px; background: #2d3d4a; color: #7fb8e8; font-size: 11px; font-weight: 600; border-radius: 3px; }\n");
+        builder.append(".event-relation-links { margin: 12px 0; }\n");
+        builder.append(".event-relation-link { color: #4a9eff; }\n");
         builder.append(".event-description { margin-top: 20px; padding: 16px; background: #252525; border-left: 3px solid #4a9eff; ");
         builder.append("color: #b0b0b0; line-height: 1.6; }\n");
+        builder.append(".sub-events-filter-indicator { margin-bottom: 8px; font-size: 12px; }\n");
         builder.append(".section { margin-top: 40px; }\n");
         builder.append(".section-heading { font-size: 18px; font-weight: 600; color: #e0e0e0; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #404040; }\n");
         builder.append(".predicates-table { width: 100%; border-collapse: collapse; font-family: 'Courier New', monospace; font-size: 13px; }\n");
@@ -752,13 +743,42 @@ public class DocumentationGenerator {
         builder.append("    }\n");
         builder.append("    const wildcardsHtml = (event.wildcards || []).map(w => '<li class=\"wildcard-item\">' + w + '</li>').join('');\n");
         builder.append("    const badges = '<span class=\"event-category-badge\">' + event.category + '</span>' + (sub ? '<span class=\"event-subcategory-badge\">' + sub + '</span>' : '');\n");
-        builder.append("    const html = '<div class=\"event-detail\"><div class=\"event-detail-header\"><div class=\"event-name\">' + event.event + '</div><div class=\"event-badges\">' + badges + '</div><div class=\"event-description\">' + (event.description || '') + '</div></div>' + (predicatesRows ? '<div class=\"section\"><h2 class=\"section-heading\">Predicates</h2><table class=\"predicates-table\"><thead><tr><th>Predicate Key</th><th>Type</th></tr></thead><tbody>' + predicatesRows + '</tbody></table></div>' : '') + (wildcardsHtml ? '<div class=\"section\"><h2 class=\"section-heading\">Wildcards</h2><ul class=\"wildcards-list\">' + wildcardsHtml + '</ul></div>' : '') + '</div>';\n");
+        builder.append("    let linksHtml = '';\n");
+        builder.append("    if (event.parent_base_key) {\n");
+        builder.append("      const parent = eventByKey[event.parent_base_key];\n");
+        builder.append("      linksHtml += '<div class=\"event-relation-links\"><span class=\"meta\">Inherits from: </span><a href=\"#\" class=\"event-relation-link\" data-event-key=\"' + event.parent_base_key + '\">' + event.parent_base_key + '</a></div>';\n");
+        builder.append("    } else {\n");
+        builder.append("      const subCount = eventsData.filter(e => e.parent_base_key === event.event).length;\n");
+        builder.append("      if (subCount > 0) linksHtml += '<div class=\"event-relation-links\"><a href=\"#\" class=\"event-relation-link\" data-filter-parent=\"' + event.event + '\">View sub-events (' + subCount + ')</a></div>';\n");
+        builder.append("    }\n");
+        builder.append("    const html = '<div class=\"event-detail\"><div class=\"event-detail-header\"><div class=\"event-name\">' + event.event + '</div><div class=\"event-badges\">' + badges + '</div>' + linksHtml + '<div class=\"event-description\">' + (event.description || '') + '</div></div>' + (predicatesRows ? '<div class=\"section\"><h2 class=\"section-heading\">Predicates</h2><table class=\"predicates-table\"><thead><tr><th>Predicate Key</th><th>Type</th></tr></thead><tbody>' + predicatesRows + '</tbody></table></div>' : '') + (wildcardsHtml ? '<div class=\"section\"><h2 class=\"section-heading\">Wildcards</h2><ul class=\"wildcards-list\">' + wildcardsHtml + '</ul></div>' : '') + '</div>';\n");
         builder.append("    const detailPanel = document.getElementById('eventDetailPanel');\n");
         builder.append("    if (detailPanel) { detailPanel.innerHTML = html; detailPanel.classList.add('active'); }\n");
         builder.append("    showPanel('eventDetail');\n");
         builder.append("    document.querySelectorAll('.event-link').forEach(link => { link.classList.toggle('active', link.getAttribute('data-event-key') === event.event); });\n");
         builder.append("  }\n");
         builder.append("  function getSubcategory(e) { const p = (e.event || '').split('.'); return p.length >= 2 ? p[1] : null; }\n");
+        builder.append("  function showSubEventsForParent(parentKey) {\n");
+        builder.append("    document.querySelector('.events-tab[data-tab=\"sub-events\"]').click();\n");
+        builder.append("    const filterEl = document.getElementById('subEventsParentFilter');\n");
+        builder.append("    if (filterEl) { filterEl.value = parentKey; applySubEventsFilter(); }\n");
+        builder.append("    const searchEl = document.querySelector('.sub-events-search');\n");
+        builder.append("    if (searchEl) { searchEl.value = ''; }\n");
+        builder.append("  }\n");
+        builder.append("\n");
+        builder.append("  document.body.addEventListener('click', e => {\n");
+        builder.append("    const link = e.target.closest('.event-relation-link');\n");
+        builder.append("    if (!link) return;\n");
+        builder.append("    e.preventDefault();\n");
+        builder.append("    if (link.hasAttribute('data-clear-parent-filter')) {\n");
+        builder.append("      const f = document.getElementById('subEventsParentFilter'); if (f) { f.value = ''; applySubEventsFilter(); }\n");
+        builder.append("      return;\n");
+        builder.append("    }\n");
+        builder.append("    const key = link.getAttribute('data-event-key');\n");
+        builder.append("    const filterParent = link.getAttribute('data-filter-parent');\n");
+        builder.append("    if (key) { const ev = eventByKey[key]; if (ev) showEvent(ev); }\n");
+        builder.append("    else if (filterParent) showSubEventsForParent(filterParent);\n");
+        builder.append("  });\n");
         builder.append("\n");
         builder.append("  document.querySelectorAll('.nav-link').forEach(link => {\n");
         builder.append("    link.addEventListener('click', () => {\n");
@@ -781,6 +801,29 @@ public class DocumentationGenerator {
         builder.append("    });\n");
         builder.append("  });\n");
         builder.append("\n");
+        builder.append("  function applySubEventsFilter() {\n");
+        builder.append("    const term = (document.querySelector('.sub-events-search')?.value || '').trim().toLowerCase();\n");
+        builder.append("    const parentFilter = (document.getElementById('subEventsParentFilter')?.value || '').trim();\n");
+        builder.append("    const ind = document.getElementById('subEventsFilterIndicator');\n");
+        builder.append("    if (ind) ind.innerHTML = parentFilter ? '<span class=\"meta\">Filtering by parent: <code>' + parentFilter + '</code> <a href=\"#\" class=\"event-relation-link\" data-clear-parent-filter>clear</a></span>' : '';\n");
+        builder.append("    const navEl = document.getElementById('subEventsNav');\n");
+        builder.append("    if (!navEl) return;\n");
+        builder.append("    navEl.querySelectorAll('.event-link').forEach(link => {\n");
+        builder.append("      const key = link.getAttribute('data-event-key');\n");
+        builder.append("      const ev = eventByKey[key];\n");
+        builder.append("      const searchMatch = !term || (key + ' ' + (ev ? ev.description || '' : '')).toLowerCase().includes(term);\n");
+        builder.append("      const parentMatch = !parentFilter || (ev && ev.parent_base_key === parentFilter);\n");
+        builder.append("      link.style.display = searchMatch && parentMatch ? '' : 'none';\n");
+        builder.append("    });\n");
+        builder.append("    navEl.querySelectorAll('.subcategory-group').forEach(grp => {\n");
+        builder.append("      const visible = Array.from(grp.querySelectorAll('.event-link')).some(l => l.style.display !== 'none');\n");
+        builder.append("      grp.style.display = visible ? '' : 'none';\n");
+        builder.append("    });\n");
+        builder.append("    navEl.querySelectorAll('.category-group').forEach(grp => {\n");
+        builder.append("      const visible = Array.from(grp.querySelectorAll('.event-link')).some(l => l.style.display !== 'none');\n");
+        builder.append("      grp.style.display = visible ? '' : 'none';\n");
+        builder.append("    });\n");
+        builder.append("  }\n");
         builder.append("  ['events', 'sub-events'].forEach(sectionId => {\n");
         builder.append("    const searchEl = document.querySelector('.' + sectionId + '-search');\n");
         builder.append("    const navEl = document.getElementById(sectionId + 'Nav');\n");
@@ -789,6 +832,7 @@ public class DocumentationGenerator {
         builder.append("    if (searchEl && navEl) {\n");
         builder.append("      searchEl.addEventListener('input', e => {\n");
         builder.append("        const term = e.target.value.trim().toLowerCase();\n");
+        builder.append("        if (sectionId === 'sub-events') { applySubEventsFilter(); return; }\n");
         builder.append("        navEl.querySelectorAll('.event-link').forEach(link => {\n");
         builder.append("          const key = link.getAttribute('data-event-key');\n");
         builder.append("          const ev = eventByKey[key];\n");

@@ -136,7 +136,7 @@ public class DocumentationGenerator {
         builder.append("<div class=\"events-tab-panel active\" id=\"eventsTabPanel\">\n");
         builder.append(buildEventsNavSection(baseEvents, "events", "Search events..."));
         builder.append("</div>\n");
-        builder.append("<div class=\"events-tab-panel\" id=\"subEventsTabPanel\">\n");
+        builder.append("<div class=\"events-tab-panel\" id=\"sub-eventsTabPanel\">\n");
         builder.append("<input type=\"hidden\" id=\"subEventsParentFilter\" value=\"\">\n");
         builder.append("<div class=\"sub-events-filter-indicator\" id=\"subEventsFilterIndicator\"></div>\n");
         builder.append(buildEventsNavSection(subEvents, "sub-events", "Search sub-events..."));

@@ -178,6 +178,7 @@ class DocumentationGeneratorTest {
         assertTrue(Files.readString(docsHtml).contains("Sub-events"), "docs.html should have Sub-events tab");
         String html = Files.readString(docsHtml);
         assertTrue(html.contains("sub-eventsNav"), "docs.html should have sub-eventsNav element for filter/filtering");
+        assertTrue(html.contains("sub-eventsTabPanel"), "docs.html should have sub-eventsTabPanel ID to match data-tab for tab switching");
     }
 
     @Test

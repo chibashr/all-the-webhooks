@@ -6,11 +6,11 @@ Generates `docs.html` and `events.json` for the All the Webhooks plugin.
 
 The generated `docs.html` uses a two-panel layout:
 
-- **Sidebar (left):**
+- **Sidebar (left, resizable via drag handle):**
   - Header with version and server info
-  - **Documentation** section: Overview, Quick start, Event key hierarchy, Message structure, Conditions, Webhook display name, Regex
-  - **Events** section: Searchable, hierarchical (category → subcategory → event), Expand/Collapse All
-  - **Sub-events** section: Same structure as Events, for discovered sub-events
+  - **Documentation** section (blue-green header): Overview, Quick start, Event key hierarchy, Message structure, Conditions, Webhook display name, Regex
+  - **Events** section (green header): Tabbed [Events | Sub-events], each with search, Expand/Collapse All, and hierarchical category → subcategory → event list
+  - Each section scrolls independently within its area
 
 - **Main content (right):**
   - Welcome screen with stats (default)

@@ -76,6 +76,7 @@ public class DocumentationGenerator {
         builder.append("<body>\n");
         builder.append("<div class=\"layout\">\n");
         builder.append(sidebar);
+        builder.append("<div class=\"sidebar-resize-handle\" id=\"sidebarResizeHandle\" title=\"Drag to resize\"></div>\n");
         builder.append("<div class=\"main-content\">\n");
         builder.append("<div class=\"content-header\">\n");
         builder.append("<div class=\"breadcrumb\" id=\"breadcrumb\"></div>\n");
@@ -104,7 +105,7 @@ public class DocumentationGenerator {
     private String buildWikiSidebar(List<EventDefinition> events, List<EventDefinition> baseEvents,
             List<EventDefinition> subEvents) {
         StringBuilder builder = new StringBuilder();
-        builder.append("<div class=\"sidebar\">\n");
+        builder.append("<div class=\"sidebar\" id=\"sidebar\">\n");
         builder.append("<div class=\"sidebar-header\">\n");
         builder.append("<div class=\"sidebar-title\">All the Webhooks</div>\n");
         builder.append("<div class=\"meta\">Version: ").append(HtmlEscaper.escape(plugin.getDescription().getVersion()))
@@ -113,8 +114,8 @@ public class DocumentationGenerator {
                 .append("</div>\n");
         builder.append("<input type=\"text\" class=\"search-input\" id=\"globalSearch\" placeholder=\"Search docs...\">\n");
         builder.append("</div>\n");
-        builder.append("<div class=\"nav-section\">\n");
-        builder.append("<div class=\"nav-section-title\">Documentation</div>\n");
+        builder.append("<div class=\"sidebar-docs\">\n");
+        builder.append("<div class=\"nav-section-title nav-section-title-docs\">Documentation</div>\n");
         builder.append("<div class=\"doc-nav\">\n");
         builder.append("<div class=\"nav-link\" data-section=\"welcome\">Overview</div>\n");
         builder.append("<div class=\"nav-link\" data-section=\"quick-start\">Quick start</div>\n");
@@ -125,14 +126,26 @@ public class DocumentationGenerator {
         builder.append("<div class=\"nav-link\" data-section=\"regex\">Regex</div>\n");
         builder.append("</div>\n");
         builder.append("</div>\n");
-        builder.append(buildEventsNavSection(baseEvents, "events", "Events", "Search events..."));
-        builder.append(buildEventsNavSection(subEvents, "sub-events", "Sub-events", "Search sub-events..."));
+        builder.append("<div class=\"sidebar-events-block\">\n");
+        builder.append("<div class=\"nav-section-title nav-section-title-events\">Events</div>\n");
+        builder.append("<div class=\"events-tabs\">\n");
+        builder.append("<button class=\"events-tab active\" data-tab=\"events\">Events</button>\n");
+        builder.append("<button class=\"events-tab\" data-tab=\"sub-events\">Sub-events</button>\n");
+        builder.append("</div>\n");
+        builder.append("<div class=\"events-tab-panels\">\n");
+        builder.append("<div class=\"events-tab-panel active\" id=\"eventsTabPanel\">\n");
+        builder.append(buildEventsNavSection(baseEvents, "events", "Search events..."));
+        builder.append("</div>\n");
+        builder.append("<div class=\"events-tab-panel\" id=\"subEventsTabPanel\">\n");
+        builder.append(buildEventsNavSection(subEvents, "sub-events", "Search sub-events..."));
+        builder.append("</div>\n");
+        builder.append("</div>\n");
+        builder.append("</div>\n");
         builder.append("</div>\n");
         return builder.toString();
     }
 
-    private String buildEventsNavSection(List<EventDefinition> events, String sectionId, String sectionTitle,
-            String searchPlaceholder) {
+    private String buildEventsNavSection(List<EventDefinition> events, String sectionId, String searchPlaceholder) {
         Map<String, Map<String, List<EventDefinition>>> hierarchical = new LinkedHashMap<>();
         for (EventDefinition e : events) {
             String category = e.getCategory();
@@ -147,8 +160,6 @@ public class DocumentationGenerator {
             }
         }
         StringBuilder builder = new StringBuilder();
-        builder.append("<div class=\"nav-section\">\n");
-        builder.append("<div class=\"nav-section-title\">").append(HtmlEscaper.escape(sectionTitle)).append("</div>\n");
         builder.append("<input type=\"text\" class=\"search-input ").append(sectionId).append("-search\" ");
         builder.append("placeholder=\"").append(HtmlEscaper.escape(searchPlaceholder)).append("\">\n");
         builder.append("<div class=\"sidebar-actions\">\n");
@@ -201,7 +212,6 @@ public class DocumentationGenerator {
             builder.append("</div>\n");
             builder.append("</div>\n");
         }
-        builder.append("</div>\n");
         builder.append("</div>\n");
         return builder.toString();
     }
@@ -596,18 +606,31 @@ public class DocumentationGenerator {
         builder.append("* { margin: 0; padding: 0; box-sizing: border-box; }\n");
         builder.append("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; ");
         builder.append("background: #1a1a1a; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }\n");
-        builder.append(".layout { display: flex; flex: 1; overflow: hidden; }\n");
-        builder.append(".sidebar { width: 300px; background: #2d2d2d; border-right: 1px solid #404040; ");
+        builder.append(".layout { display: flex; flex: 1; overflow: hidden; min-width: 0; }\n");
+        builder.append(".sidebar { width: 300px; min-width: 200px; max-width: 500px; background: #2d2d2d; ");
         builder.append("display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }\n");
+        builder.append(".sidebar-resize-handle { width: 6px; background: #404040; cursor: col-resize; flex-shrink: 0; }\n");
+        builder.append(".sidebar-resize-handle:hover { background: #4a9eff; }\n");
         builder.append(".sidebar-header { padding: 20px; border-bottom: 1px solid #404040; background: #252525; flex-shrink: 0; }\n");
         builder.append(".sidebar-title { font-size: 14px; font-weight: 600; color: #888; text-transform: uppercase; ");
         builder.append("letter-spacing: 1px; margin-bottom: 15px; }\n");
         builder.append(".search-input { width: 100%; padding: 8px 12px; background: #1a1a1a; border: 1px solid #404040; ");
         builder.append("border-radius: 4px; color: #e0e0e0; font-size: 13px; }\n");
         builder.append(".search-input:focus { outline: none; border-color: #4a9eff; }\n");
-        builder.append(".nav-section { flex: 1; overflow-y: auto; padding: 10px 0; }\n");
-        builder.append(".nav-section-title { padding: 12px 20px; font-size: 12px; font-weight: 600; color: #888; ");
-        builder.append("text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; background: #2d2d2d; z-index: 10; }\n");
+        builder.append(".sidebar-docs { flex-shrink: 0; overflow-y: auto; padding: 10px 0; border-bottom: 2px solid #1a4a6e; }\n");
+        builder.append(".sidebar-events-block { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-top: 2px solid #4a6e1a; }\n");
+        builder.append(".nav-section-title { padding: 12px 20px; font-size: 12px; font-weight: 600; ");
+        builder.append("text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }\n");
+        builder.append(".nav-section-title-docs { background: #1a3a4a; color: #5db8e8; border-bottom: 1px solid #204a5a; }\n");
+        builder.append(".nav-section-title-events { background: #2a3a1a; color: #8bc34a; border-bottom: 1px solid #304a20; }\n");
+        builder.append(".events-tabs { display: flex; flex-shrink: 0; border-bottom: 1px solid #404040; }\n");
+        builder.append(".events-tab { flex: 1; padding: 8px 12px; background: #252525; border: none; color: #888; font-size: 12px; ");
+        builder.append("cursor: pointer; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.15s; }\n");
+        builder.append(".events-tab:hover { background: #303030; color: #b0b0b0; }\n");
+        builder.append(".events-tab.active { background: #2a3a1a; color: #8bc34a; border-bottom: 2px solid #8bc34a; }\n");
+        builder.append(".events-tab-panels { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }\n");
+        builder.append(".events-tab-panel { display: none; flex: 1; min-height: 0; flex-direction: column; overflow: hidden; padding: 10px; }\n");
+        builder.append(".events-tab-panel.active { display: flex; overflow-y: auto; }\n");
         builder.append(".nav-link { padding: 8px 20px; cursor: pointer; color: #b0b0b0; font-size: 14px; ");
         builder.append("transition: background 0.15s, color 0.15s; }\n");
         builder.append(".nav-link:hover, .nav-link.active { background: #353535; color: #e0e0e0; }\n");
@@ -790,6 +813,32 @@ public class DocumentationGenerator {
         builder.append("  document.querySelectorAll('.category-header, .subcategory-header').forEach(header => {\n");
         builder.append("    header.addEventListener('click', () => header.parentElement.classList.toggle('expanded'));\n");
         builder.append("  });\n");
+        builder.append("\n");
+        builder.append("  document.querySelectorAll('.events-tab').forEach(tab => {\n");
+        builder.append("    tab.addEventListener('click', () => {\n");
+        builder.append("      const id = tab.getAttribute('data-tab');\n");
+        builder.append("      document.querySelectorAll('.events-tab').forEach(t => t.classList.remove('active'));\n");
+        builder.append("      document.querySelectorAll('.events-tab-panel').forEach(p => p.classList.remove('active'));\n");
+        builder.append("      tab.classList.add('active');\n");
+        builder.append("      const panel = document.getElementById(id + 'TabPanel');\n");
+        builder.append("      if (panel) panel.classList.add('active');\n");
+        builder.append("    });\n");
+        builder.append("  });\n");
+        builder.append("\n");
+        builder.append("  const sidebar = document.getElementById('sidebar');\n");
+        builder.append("  const handle = document.getElementById('sidebarResizeHandle');\n");
+        builder.append("  if (sidebar && handle) {\n");
+        builder.append("    let dragging = false;\n");
+        builder.append("    handle.addEventListener('mousedown', e => { e.preventDefault(); dragging = true; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; });\n");
+        builder.append("    const stopDrag = () => { if (dragging) { dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; } };\n");
+        builder.append("    document.addEventListener('mouseup', stopDrag);\n");
+        builder.append("    document.addEventListener('mouseleave', stopDrag);\n");
+        builder.append("    document.addEventListener('mousemove', e => {\n");
+        builder.append("      if (!dragging) return;\n");
+        builder.append("      const w = Math.max(200, Math.min(500, e.clientX));\n");
+        builder.append("      sidebar.style.width = w + 'px';\n");
+        builder.append("    });\n");
+        builder.append("  }\n");
         builder.append("\n");
         builder.append("  showPanel('welcome');\n");
         builder.append("  document.querySelector('.nav-link[data-section=\"welcome\"]').classList.add('active');\n");

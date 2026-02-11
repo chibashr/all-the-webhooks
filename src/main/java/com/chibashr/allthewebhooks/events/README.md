@@ -12,6 +12,17 @@ On plugin initialization, **EventDiscovery** scans the classpath for Bukkit/Pape
 
 Built-in definitions (e.g. `player.join`, `server.enable`) and events handled by **EventListener** are skipped so there are no duplicate handlers. Docs are generated from **EventRegistry.getDefinitions()**, so discovered events appear in the generated documentation with their discovered predicates and descriptions.
 
+## Sub-event discovery
+
+**SubEventDiscovery** runs after EventDiscovery and scans Paper registries and Bukkit enums at startup to add sub-event definitions:
+
+- **player.death.*** — From the DamageType registry. Each damage type (cactus, lava, drown, etc.) and its `.player` variant (when a mob/player caused the death) are registered. Fall death variants (`death.fell.*`) are also added. Event keys use the format `player.death.attack.dryout.player` (the leading `death.` is stripped to avoid redundancy).
+- **entity.damage.player.*** — From `EntityDamageEvent.DamageCause` enum. Each cause (e.g. `drowning`, `fall`) is registered as `entity.damage.player.<cause>`.
+
+When a player dies or takes damage, the context builder emits the most specific event key (e.g. `player.death.attack.lava`), so rules for that specific key or wildcards like `player.death.attack.*` match.
+
+**DeathMessageKeyResolver** extracts the Minecraft death message key from `EntityDeathEvent.getDamageSource()` and builds the event key for routing.
+
 ## Event rule nesting
 
 `events.yaml` supports nested sections, but only leaf sections that contain rule fields (`message`, `webhook`, `enabled`, `require-permission`, `conditions`, `rate-limit`) are registered as rules. This prevents parent grouping nodes (like `events.player`) from matching every `player.*` event when only `events.player.join` is intended.

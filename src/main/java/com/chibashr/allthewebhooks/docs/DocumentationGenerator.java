@@ -105,7 +105,11 @@ public class DocumentationGenerator {
             builder.append("<div class=\"nav-section\">\n");
             builder.append("<div class=\"nav-heading\">Docs</div>\n");
             builder.append("<a class=\"nav-anchor nav-link\" href=\"#overview\">Overview</a>\n");
+            builder.append("<a class=\"nav-anchor nav-link\" href=\"#quick-start\">Quick start</a>\n");
+            builder.append("<a class=\"nav-anchor nav-link\" href=\"#event-keys\">Event key hierarchy</a>\n");
             builder.append("<a class=\"nav-anchor nav-link\" href=\"#message-structure\">Message structure</a>\n");
+            builder.append("<a class=\"nav-anchor nav-link\" href=\"#conditions\">Conditions</a>\n");
+            builder.append("<a class=\"nav-anchor nav-link\" href=\"#webhook-display-name\">Webhook display name</a>\n");
             builder.append("<a class=\"nav-anchor nav-link\" href=\"#regex\">Regex</a>\n");
             builder.append("<a class=\"nav-anchor nav-link\" href=\"#events\">Events</a>\n");
             builder.append("</div>\n");
@@ -121,7 +125,11 @@ public class DocumentationGenerator {
     private String buildDocsContent(List<EventDefinition> events) {
         StringBuilder builder = new StringBuilder();
         builder.append(buildOverviewSection());
+        builder.append(buildQuickStartSection());
+        builder.append(buildEventKeysSection(events));
         builder.append(buildMessageStructureSection());
+        builder.append(buildConditionsSection());
+        builder.append(buildWebhookDisplayNameSection());
         builder.append(buildPlaceholderRegexSpecSection());
         builder.append(buildEventsContent(events, true));
         return builder.toString();
@@ -143,6 +151,81 @@ public class DocumentationGenerator {
         return builder.toString();
     }
 
+    private String buildQuickStartSection() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<section id=\"quick-start\" class=\"doc-section\" data-anchor=\"quick-start\">\n");
+        builder.append("<h1>Quick start</h1>\n");
+        builder.append("<ol>\n");
+        builder.append("<li><strong>Configure a webhook</strong> in <code>config.yaml</code> under <code>webhooks</code>.</li>\n");
+        builder.append("<li><strong>Choose an event</strong> from the <a class=\"inline-link\" href=\"#events\">Events</a> section (e.g. <code>player.death</code>, <code>player.join</code>).</li>\n");
+        builder.append("<li><strong>Add a rule</strong> in <code>events.yaml</code> under <code>events</code> with <code>message</code> and optional <code>conditions</code>.</li>\n");
+        builder.append("<li><strong>Define the message</strong> in <code>messages.yaml</code> using placeholders from the event's predicates.</li>\n");
+        builder.append("</ol>\n");
+        builder.append("<div class=\"example-block\">\n");
+        builder.append("<div class=\"example-title\">Example: notify on player death</div>\n");
+        builder.append("<pre># events.yaml\nevents:\n  player.death:\n    message: death_alert\n\n# messages.yaml\nmessages:\n  death_alert:\n    content: \"**{player.name}** died in {world.name}\"</pre>\n");
+        builder.append("</div>\n");
+        builder.append("<div class=\"example-block\">\n");
+        builder.append("<div class=\"example-title\">Example: only lava deaths</div>\n");
+        builder.append("<pre>events:\n  player.death.attack.lava:\n    message: lava_death\n\nmessages:\n  lava_death:\n    content: \"**{player.name}** tried to swim in lava in {world.name}\"</pre>\n");
+        builder.append("</div>\n");
+        builder.append("</section>\n");
+        return builder.toString();
+    }
+
+    private String buildEventKeysSection(List<EventDefinition> events) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<section id=\"event-keys\" class=\"doc-section\" data-anchor=\"event-keys\">\n");
+        builder.append("<h1>Event key hierarchy</h1>\n");
+        builder.append("<p>Event keys use dot notation and support <strong>wildcard matching</strong>. More specific keys match before less specific ones.</p>\n");
+        builder.append("<h3>How matching works</h3>\n");
+        builder.append("<ul>\n");
+        builder.append("<li><code>player.death.attack.dryout.player</code> — matches only that exact death type.</li>\n");
+        builder.append("<li><code>player.death.attack.*</code> — matches all attack-type deaths (cactus, lava, etc.).</li>\n");
+        builder.append("<li><code>player.death</code> — matches any player death.</li>\n");
+        builder.append("</ul>\n");
+        builder.append("<h3>Event categories</h3>\n");
+        builder.append("<p>Events are grouped by category. Use the search box or sidebar to find events.</p>\n");
+        Map<String, Long> categoryCounts = new LinkedHashMap<>();
+        for (EventDefinition e : events) {
+            categoryCounts.merge(e.getCategory(), 1L, Long::sum);
+        }
+        builder.append("<ul>\n");
+        for (Map.Entry<String, Long> entry : categoryCounts.entrySet()) {
+            builder.append("<li><strong>").append(HtmlEscaper.escape(entry.getKey())).append("</strong> — ")
+                    .append(entry.getValue()).append(" event(s)</li>\n");
+        }
+        builder.append("</ul>\n");
+        builder.append("<p class=\"meta\">Event keys are discovered at startup from Bukkit/Paper registries and enums. ");
+        builder.append("Death types, damage causes, and other sub-events are scanned dynamically.</p>\n");
+        builder.append("</section>\n");
+        return builder.toString();
+    }
+
+    private String buildConditionsSection() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<section id=\"conditions\" class=\"doc-section\" data-anchor=\"conditions\">\n");
+        builder.append("<h1>Conditions</h1>\n");
+        builder.append("<p>Add <code>conditions</code> to event rules to filter when the webhook fires. Each condition key must match a predicate from the event.</p>\n");
+        builder.append("<h3>Available operators</h3>\n");
+        builder.append("<ul>\n");
+        builder.append("<li><code>equals</code> — exact match (string or number)</li>\n");
+        builder.append("<li><code>not</code> — value not in list</li>\n");
+        builder.append("<li><code>greater-than</code> / <code>less-than</code> — numeric comparison</li>\n");
+        builder.append("<li><code>regex</code> — pattern match</li>\n");
+        builder.append("</ul>\n");
+        builder.append("<div class=\"example-block\">\n");
+        builder.append("<div class=\"example-title\">Example: only drownings</div>\n");
+        builder.append("<pre>events:\n  player.death:\n    message: death_alert\n    conditions:\n      death.message.key:\n        equals: death.attack.drown</pre>\n");
+        builder.append("</div>\n");
+        builder.append("<div class=\"example-block\">\n");
+        builder.append("<div class=\"example-title\">Example: exclude fall damage</div>\n");
+        builder.append("<pre>events:\n  entity.damage.player:\n    message: player_damaged\n    conditions:\n      damage.cause:\n        not:\n          - FALL\n          - FALLING_BLOCK</pre>\n");
+        builder.append("</div>\n");
+        builder.append("</section>\n");
+        return builder.toString();
+    }
+
     private String buildMessageStructureSection() {
         StringBuilder builder = new StringBuilder();
         builder.append("<section id=\"message-structure\" class=\"doc-section\" data-anchor=\"message-structure\">\n");
@@ -153,7 +236,7 @@ public class DocumentationGenerator {
         builder.append("for example <code>messages.player_damaged.content</code>.</p>\n");
         builder.append("<p>The <code>content</code> value is a template string. Placeholders use ");
         builder.append("<code>{placeholder}</code> syntax, such as <code>{player.name}</code> or ");
-        builder.append("<code>{damage.amount}</code>.</p>\n");
+        builder.append("<code>{damage.amount}</code>. You can also set optional <code>username</code> per message to control the webhook display name; see <a class=\"inline-link\" href=\"#webhook-display-name\">Webhook display name</a>.</p>\n");
         builder.append("<p>Available placeholders correspond to the same predicate fields listed for each event ");
         builder.append("in the Events section. If a placeholder has no value, it is replaced with an empty string.</p>\n");
         builder.append("<div class=\"example-block\">\n");
@@ -168,6 +251,43 @@ public class DocumentationGenerator {
         builder.append("</pre>\n");
         builder.append("<p class=\"meta\">See <a class=\"inline-link\" href=\"#events\">Events</a> ");
         builder.append("for the full list of supported predicates per event.</p>\n");
+        builder.append("</div>\n");
+        builder.append("</section>\n");
+        return builder.toString();
+    }
+
+    private String buildWebhookDisplayNameSection() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<section id=\"webhook-display-name\" class=\"doc-section\" data-anchor=\"webhook-display-name\">\n");
+        builder.append("<h1>Webhook display name</h1>\n");
+        builder.append("<p>For Discord (and compatible webhooks), the name shown as the message author can be set in three places. ");
+        builder.append("The first value found in the order below is used.</p>\n");
+        builder.append("<ol>\n");
+        builder.append("<li><strong>Per message</strong> — In <code>messages.yaml</code>, add optional <code>username</code> to a message entry. "
+                + "Example: <code>messages.player_join.username: \"Join/Quit\"</code>.</li>\n");
+        builder.append("<li><strong>Per event or defaults</strong> — In <code>events.yaml</code>, set <code>webhook-username</code> under "
+                + "<code>defaults</code> or on any event rule. Example: <code>webhook-username: \"Diamond Alerts\"</code>.</li>\n");
+        builder.append("<li><strong>Per webhook</strong> — In <code>config.yaml</code>, add optional <code>username</code> under each webhook. "
+                + "Example: <code>webhooks.default.username: \"Server Alerts\"</code>.</li>\n");
+        builder.append("</ol>\n");
+        builder.append("<p>If none are set, the webhook uses whatever name is configured in the Discord (or provider) webhook settings.</p>\n");
+        builder.append("<div class=\"example-block\">\n");
+        builder.append("<div class=\"example-title\">Example</div>\n");
+        builder.append("<pre>config.yaml\n");
+        builder.append("webhooks:\n");
+        builder.append("  default:\n");
+        builder.append("    url: \"https://discord.com/api/webhooks/...\"\n");
+        builder.append("    username: \"Server Alerts\"\n\n");
+        builder.append("events.yaml\n");
+        builder.append("events:\n");
+        builder.append("  player.break.block.diamond_ore:\n");
+        builder.append("    webhook: moderation\n");
+        builder.append("    webhook-username: \"Diamond Alerts\"\n");
+        builder.append("    message: diamond_mined\n\n");
+        builder.append("messages.yaml\n");
+        builder.append("  player_join:\n");
+        builder.append("    content: \"**{player.name}** joined\"\n");
+        builder.append("    username: \"Join/Quit\"</pre>\n");
         builder.append("</div>\n");
         builder.append("</section>\n");
         return builder.toString();
@@ -484,8 +604,28 @@ public class DocumentationGenerator {
         builder.append("<h2>").append(HtmlEscaper.escape(event.getKey())).append("</h2>");
         builder.append("<div class=\"meta\">Category: ").append(HtmlEscaper.escape(event.getCategory())).append("</div>");
         builder.append("<p>").append(HtmlEscaper.escape(event.getDescription())).append("</p>");
+        if (event.getKey().startsWith("player.death.") && event.getPredicateFields().containsKey("death.message.key")) {
+            String minecraftKey = "death." + event.getKey().substring("player.death.".length());
+            builder.append("<div class=\"event-section\">");
+            builder.append("<h3>Minecraft translation key</h3>");
+            builder.append("<p>Use <code>death.message.key</code> in conditions to match this death type. ");
+            builder.append("Full key: <code>").append(HtmlEscaper.escape(minecraftKey)).append("</code></p>");
+            builder.append("</div>");
+        }
         builder.append("<div class=\"event-section\">");
-        builder.append("<h3>Supported predicates</h3>");
+        builder.append("<h3>Placeholders (for messages)</h3>");
+        builder.append("<p>Use these in <code>messages.yaml</code> with <code>{key}</code> syntax:</p>");
+        builder.append("<ul>");
+        for (Map.Entry<String, String> entry : event.getPredicateFields().entrySet()) {
+            builder.append("<li><code>{").append(HtmlEscaper.escape(entry.getKey()))
+                    .append("}</code> <span class=\"meta\">")
+                    .append(HtmlEscaper.escape(entry.getValue())).append("</span></li>");
+        }
+        builder.append("</ul>");
+        builder.append("</div>");
+        builder.append("<div class=\"event-section\">");
+        builder.append("<h3>Condition predicates</h3>");
+        builder.append("<p>Use these keys under <code>conditions</code> in <code>events.yaml</code>:</p>");
         builder.append("<ul>");
         for (Map.Entry<String, String> entry : event.getPredicateFields().entrySet()) {
             builder.append("<li><code>").append(HtmlEscaper.escape(entry.getKey()))
@@ -496,6 +636,7 @@ public class DocumentationGenerator {
         builder.append("</div>");
         builder.append("<div class=\"event-section\">");
         builder.append("<h3>Wildcard support</h3>");
+        builder.append("<p>These patterns match this event or its children:</p>");
         for (String example : event.getWildcardExamples()) {
             builder.append("<div><code>").append(HtmlEscaper.escape(example)).append("</code></div>");
         }
@@ -511,8 +652,15 @@ public class DocumentationGenerator {
     private String buildSearchIndex(EventDefinition event) {
         StringBuilder builder = new StringBuilder();
         builder.append(event.getKey()).append(" ").append(event.getCategory());
+        builder.append(" ").append(event.getDescription());
         for (String field : event.getPredicateFields().keySet()) {
             builder.append(" ").append(field);
+        }
+        for (String w : event.getWildcardExamples()) {
+            builder.append(" ").append(w);
+        }
+        if (event.getKey().startsWith("player.death.")) {
+            builder.append(" death ").append("death.").append(event.getKey().substring("player.death.".length()));
         }
         return builder.toString().toLowerCase();
     }

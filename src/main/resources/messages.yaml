@@ -1,11 +1,13 @@
 # All the Webhooks — Message Templates
 
+# Optional "username" per message overrides the webhook display name for that message only.
 messages:
   generic:
     content: "{event.name} occurred"
 
   player_join:
     content: "**{player.name}** joined the server"
+    # username: "Join/Quit"   # optional
 
   player_quit:
     content: "**{player.name}** left the server"
@@ -15,6 +17,12 @@ messages:
 
   generic_block_break:
     content: "{player.name} broke a block in {world.name}"
+
+  player_death:
+    content: "**{player.name}** died in {world.name}"
+
+  lava_death:
+    content: "**{player.name}** tried to swim in lava in {world.name}"
 
   player_damaged:
     content: "{player.name} took {damage.amount} damage from {damage.cause}"

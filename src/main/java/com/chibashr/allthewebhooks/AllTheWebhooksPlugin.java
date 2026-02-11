@@ -7,6 +7,7 @@ import com.chibashr.allthewebhooks.events.EventContext;
 import com.chibashr.allthewebhooks.events.EventDiscovery;
 import com.chibashr.allthewebhooks.events.EventListener;
 import com.chibashr.allthewebhooks.events.EventRegistry;
+import com.chibashr.allthewebhooks.events.SubEventDiscovery;
 import com.chibashr.allthewebhooks.routing.EventRouter;
 import com.chibashr.allthewebhooks.stats.StatsTracker;
 import com.chibashr.allthewebhooks.util.WarningTracker;
@@ -46,6 +47,7 @@ public class AllTheWebhooksPlugin extends JavaPlugin {
         for (EventDiscovery.DiscoveredEvent d : discovered) {
             eventRegistry.addDiscoveredDefinition(d.definition());
         }
+        SubEventDiscovery.discover(getServer(), eventRegistry, getLogger());
         configManager = new ConfigManager(this, warningTracker, eventRegistry);
         configManager.reloadAll(true);
         eventRegistry.updateFromConfig(configManager.getSnapshot().eventConfig());

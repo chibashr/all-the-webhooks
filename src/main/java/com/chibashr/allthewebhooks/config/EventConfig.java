@@ -19,7 +19,7 @@ public class EventConfig {
         if (key == null || key.isEmpty()) {
             return;
         }
-        eventRules.put(key, rule == null ? new EventRule(null, null, null, null, Map.of(), null) : rule);
+        eventRules.put(key, rule == null ? new EventRule(null, null, null, null, null, Map.of(), null) : rule);
     }
 
     public void putWorldConfig(String worldName, WorldEventConfig worldConfig) {

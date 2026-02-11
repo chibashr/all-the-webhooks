@@ -14,6 +14,7 @@ public final class TestEventRuleFactory {
     public static EventRule create(
             Boolean enabled,
             String webhook,
+            String webhookUsername,
             String message,
             String requirePermission,
             Map<String, Object> conditions,
@@ -22,6 +23,7 @@ public final class TestEventRuleFactory {
         return new EventRule(
                 enabled,
                 webhook,
+                webhookUsername,
                 message,
                 requirePermission,
                 conditions == null ? Map.of() : conditions,
@@ -30,6 +32,6 @@ public final class TestEventRuleFactory {
     }
 
     public static EventRule create(String message, String webhook) {
-        return create(true, webhook, message, null, Map.of(), null);
+        return create(true, webhook, null, message, null, Map.of(), null);
     }
 }

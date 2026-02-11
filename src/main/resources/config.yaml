@@ -8,14 +8,17 @@ plugin:
 # ----------------------------------------
 # Webhook Definitions
 # ----------------------------------------
+# Optional "username" sets the Discord display name for messages to this webhook.
 webhooks:
   default:
     url: "https://discord.com/api/webhooks/PROJECT1"
     timeout-ms: 5000
+    # username: "Server Alerts"
 
   moderation:
     url: "https://discord.com/api/webhooks/PROJECT2"
     timeout-ms: 5000
+    # username: "Moderation Bot"
 
 # ----------------------------------------
 # Rate Limiting

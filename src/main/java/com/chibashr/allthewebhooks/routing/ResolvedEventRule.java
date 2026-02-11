@@ -8,6 +8,7 @@ public class ResolvedEventRule {
     private final String matchedKey;
     private final boolean enabled;
     private final String webhook;
+    private final String webhookUsername;
     private final String message;
     private final String permission;
     private final Map<String, Object> conditions;
@@ -18,6 +19,7 @@ public class ResolvedEventRule {
             String matchedKey,
             boolean enabled,
             String webhook,
+            String webhookUsername,
             String message,
             String permission,
             Map<String, Object> conditions,
@@ -27,6 +29,7 @@ public class ResolvedEventRule {
         this.matchedKey = matchedKey;
         this.enabled = enabled;
         this.webhook = webhook;
+        this.webhookUsername = webhookUsername;
         this.message = message;
         this.permission = permission;
         this.conditions = conditions == null ? Map.of() : Collections.unmodifiableMap(conditions);
@@ -34,7 +37,7 @@ public class ResolvedEventRule {
     }
 
     public static ResolvedEventRule disabled(String eventKey) {
-        return new ResolvedEventRule(eventKey, null, false, null, null, null, Map.of(), null);
+        return new ResolvedEventRule(eventKey, null, false, null, null, null, null, Map.of(), null);
     }
 
     public String getEventKey() {
@@ -51,6 +54,10 @@ public class ResolvedEventRule {
 
     public String getWebhook() {
         return webhook;
+    }
+
+    public String getWebhookUsername() {
+        return webhookUsername;
     }
 
     public String getMessage() {

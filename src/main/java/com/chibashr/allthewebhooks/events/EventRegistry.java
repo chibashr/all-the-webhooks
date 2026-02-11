@@ -140,19 +140,22 @@ public class EventRegistry {
                         "player.name", "string",
                         "player.uuid", "uuid",
                         "world.name", "string",
-                        "death.message", "string"
+                        "death.message", "string",
+                        "death.message.key", "string"
                 ),
-                List.of("player.death.*"),
+                List.of("player.death.*", "player.death.attack.*", "player.death.fell.*"),
                 "player.death:\n  message: generic",
                 (PlayerDeathEvent event) -> {
-                    EventContext context = new EventContext("player.death");
+                    String eventKey = DeathMessageKeyResolver.buildPlayerDeathEventKey(event);
+                    EventContext context = new EventContext(eventKey);
                     Player player = event.getEntity();
                     context.setPlayer(player);
                     context.setWorld(player.getWorld());
                     context.put("player.name", player.getName());
                     context.put("player.uuid", player.getUniqueId().toString());
                     context.put("world.name", player.getWorld().getName());
-                    context.put("death.message", event.getDeathMessage());
+                    context.put("death.message", event.getDeathMessage() != null ? event.getDeathMessage() : "");
+                    context.put("death.message.key", DeathMessageKeyResolver.resolveFullMinecraftKey(event));
                     return context;
                 }
         ));
@@ -226,13 +229,15 @@ public class EventRegistry {
                         "damage.cause", "string",
                         "world.name", "string"
                 ),
-                List.of("entity.damage.*"),
+                List.of("entity.damage.*", "entity.damage.player.*"),
                 "entity.damage.player:\n  message: player_damaged",
                 (EntityDamageEvent event) -> {
                     if (!(event.getEntity() instanceof Player player)) {
                         return null;
                     }
-                    EventContext context = new EventContext("entity.damage.player");
+                    String causeKey = event.getCause().name().toLowerCase();
+                    String eventKey = "entity.damage.player." + causeKey;
+                    EventContext context = new EventContext(eventKey);
                     context.setPlayer(player);
                     context.setWorld(player.getWorld());
                     context.put("player.name", player.getName());
@@ -437,6 +442,8 @@ public class EventRegistry {
         }
         if (eventKey.equals("player.death") || eventKey.startsWith("player.death.")) {
             ctx.put("death.message", "(manual test)");
+            String suffix = eventKey.startsWith("player.death.") ? eventKey.substring("player.death.".length()) : "generic";
+            ctx.put("death.message.key", "death." + suffix);
             return ctx;
         }
         if (eventKey.equals("player.break.block") || eventKey.startsWith("player.break.block.")) {
@@ -453,7 +460,8 @@ public class EventRegistry {
         }
         if (eventKey.equals("entity.damage.player") || eventKey.startsWith("entity.damage.")) {
             ctx.put("damage.amount", 0);
-            ctx.put("damage.cause", "CUSTOM");
+            String cause = eventKey.startsWith("entity.damage.player.") ? eventKey.substring("entity.damage.player.".length()).toUpperCase() : "CUSTOM";
+            ctx.put("damage.cause", cause.replace("-", "_"));
             return ctx;
         }
         if (eventKey.equals("inventory.open") || eventKey.startsWith("inventory.open.")) {

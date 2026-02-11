@@ -145,6 +145,11 @@ public class EventRouter {
             return;
         }
 
+        String effectiveUsername = snapshot.messageConfig().getMessageUsername(messageId);
+        if (effectiveUsername == null) {
+            effectiveUsername = resolved.getWebhookUsername();
+        }
+
         if (dryRun) {
             if (report != null) {
                 report.accept("[All the Webhooks] Dry run: would dispatch to webhook " + resolved.getWebhook() + " (not sent).");
@@ -152,7 +157,7 @@ public class EventRouter {
             return;
         }
 
-        dispatcher.dispatch(context.getEventKey(), webhook, content);
+        dispatcher.dispatch(context.getEventKey(), webhook, content, effectiveUsername);
         if (report != null) {
             report.accept("[All the Webhooks] Dispatched to webhook " + resolved.getWebhook() + ".");
         }

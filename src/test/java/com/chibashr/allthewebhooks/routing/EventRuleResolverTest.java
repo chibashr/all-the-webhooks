@@ -24,7 +24,7 @@ class EventRuleResolverTest {
     @BeforeEach
     void setUp() {
         resolver = new EventRuleResolver();
-        defaults = new EventRuleDefaults(true, "default", "generic", null);
+        defaults = new EventRuleDefaults(true, "default", null, "generic", null);
     }
 
     @Test
@@ -69,7 +69,7 @@ class EventRuleResolverTest {
     @Test
     void resolve_defaultsApplied_whenRuleHasNulls() {
         EventConfig config = new EventConfig(defaults);
-        config.putEventRule("player.join", TestEventRuleFactory.create(null, null, null, null, null, null));
+        config.putEventRule("player.join", TestEventRuleFactory.create(null, null, null, null, null, null, null));
         ResolvedEventRule result = resolver.resolve(config, "player.join", null);
         assertNotNull(result);
         assertTrue(result.isEnabled());

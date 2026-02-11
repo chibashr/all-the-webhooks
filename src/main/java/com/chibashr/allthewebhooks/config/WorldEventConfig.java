@@ -46,6 +46,7 @@ public class WorldEventConfig {
     private static boolean hasRuleFields(ConfigurationSection section) {
         return section.contains("enabled")
                 || section.contains("webhook")
+                || section.contains("webhook-username")
                 || section.contains("message")
                 || section.contains("require-permission")
                 || section.contains("conditions")

@@ -70,9 +70,9 @@ public class WebhookDispatcher {
         return false;
     }
 
-    public void dispatch(String eventKey, WebhookDefinition webhook, String content) {
+    public void dispatch(String eventKey, WebhookDefinition webhook, String content, String username) {
         PluginConfig config = configManager.getSnapshot().pluginConfig();
-        Runnable task = () -> sendWebhook(eventKey, webhook, content, config);
+        Runnable task = () -> sendWebhook(eventKey, webhook, content, username, config);
         if (config.isDispatchAsync()) {
             asyncExecutor.runAsync(task);
         } else {
@@ -85,9 +85,16 @@ public class WebhookDispatcher {
         eventLimiters.clear();
     }
 
-    private void sendWebhook(String eventKey, WebhookDefinition webhook, String content, PluginConfig config) {
+    private void sendWebhook(String eventKey, WebhookDefinition webhook, String content, String username, PluginConfig config) {
         try {
-            String payload = "{\"content\":\"" + JsonEscaper.escape(content) + "\"}";
+            String effectiveUsername = username != null && !username.isEmpty() ? username : webhook.username();
+            StringBuilder json = new StringBuilder();
+            json.append("{\"content\":\"").append(JsonEscaper.escape(content)).append("\"");
+            if (effectiveUsername != null && !effectiveUsername.isEmpty()) {
+                json.append(",\"username\":\"").append(JsonEscaper.escape(effectiveUsername)).append("\"");
+            }
+            json.append("}");
+            String payload = json.toString();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(webhook.url()))
                     .timeout(Duration.ofMillis(webhook.timeoutMs()))

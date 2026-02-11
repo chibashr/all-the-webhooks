@@ -116,7 +116,11 @@ public class ConfigManager {
                 }
                 String url = webhookSection.getString("url", "");
                 int timeout = webhookSection.getInt("timeout-ms", 5000);
-                builder.webhook(key, new WebhookDefinition(url, timeout));
+                String username = webhookSection.getString("username", null);
+                if (username != null && username.isEmpty()) {
+                    username = null;
+                }
+                builder.webhook(key, new WebhookDefinition(url, timeout, username));
             }
         }
 
@@ -159,6 +163,10 @@ public class ConfigManager {
                     continue;
                 }
                 messageConfig.put(key, section.getString("content", ""));
+                String username = section.getString("username", null);
+                if (username != null && !username.isEmpty()) {
+                    messageConfig.putUsername(key, username);
+                }
             }
         }
         return messageConfig;
@@ -258,6 +266,10 @@ public class ConfigManager {
                     continue;
                 }
                 messageConfig.put(key, section.getString("content", ""));
+                String username = section.getString("username", null);
+                if (username != null && !username.isEmpty()) {
+                    messageConfig.putUsername(key, username);
+                }
             }
         }
 
@@ -318,6 +330,7 @@ public class ConfigManager {
     private boolean hasRuleFields(ConfigurationSection section) {
         return section.contains("enabled")
                 || section.contains("webhook")
+                || section.contains("webhook-username")
                 || section.contains("message")
                 || section.contains("require-permission")
                 || section.contains("conditions")

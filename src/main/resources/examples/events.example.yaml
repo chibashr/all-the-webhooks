@@ -26,6 +26,7 @@ events:
 
   player.break.block.diamond_ore:
     webhook: moderation
+    webhook-username: "Diamond Alerts"   # optional; Discord display name for this event
     message: diamond_mined
 
   player.break.block.*:

@@ -47,6 +47,7 @@ public class EventRuleResolver {
         EventRule rule = rules.get(bestKey);
         boolean enabled = rule.getEnabled() == null ? defaults.isEnabled() : rule.getEnabled();
         String webhook = rule.getWebhook() == null ? defaults.getWebhook() : rule.getWebhook();
+        String webhookUsername = rule.getWebhookUsername() == null ? defaults.getWebhookUsername() : rule.getWebhookUsername();
         String message = rule.getMessage() == null ? defaults.getMessage() : rule.getMessage();
         String permission = rule.getRequirePermission() == null ? defaults.getRequirePermission() : rule.getRequirePermission();
         return new ResolvedEventRule(
@@ -54,6 +55,7 @@ public class EventRuleResolver {
                 bestKey,
                 enabled,
                 webhook,
+                webhookUsername,
                 message,
                 permission,
                 rule.getConditions(),

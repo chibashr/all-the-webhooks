@@ -16,6 +16,7 @@ public class EventRule {
     );
     private final Boolean enabled;
     private final String webhook;
+    private final String webhookUsername;
     private final String message;
     private final String requirePermission;
     private final Map<String, Object> conditions;
@@ -24,6 +25,7 @@ public class EventRule {
     EventRule(
             Boolean enabled,
             String webhook,
+            String webhookUsername,
             String message,
             String requirePermission,
             Map<String, Object> conditions,
@@ -31,6 +33,7 @@ public class EventRule {
     ) {
         this.enabled = enabled;
         this.webhook = webhook;
+        this.webhookUsername = webhookUsername;
         this.message = message;
         this.requirePermission = requirePermission;
         this.conditions = conditions == null ? Map.of() : Collections.unmodifiableMap(conditions);
@@ -39,7 +42,7 @@ public class EventRule {
 
     public static EventRule fromSection(ConfigurationSection section) {
         if (section == null) {
-            return new EventRule(null, null, null, null, Map.of(), null);
+            return new EventRule(null, null, null, null, null, Map.of(), null);
         }
         Map<String, Object> conditions = new HashMap<>();
         ConfigurationSection conditionSection = section.getConfigurationSection("conditions");
@@ -53,9 +56,15 @@ public class EventRule {
             rateLimit = rateLimitSection.getInt("events-per-second");
         }
 
+        String webhookUsername = section.getString("webhook-username", null);
+        if (webhookUsername != null && webhookUsername.isEmpty()) {
+            webhookUsername = null;
+        }
+
         return new EventRule(
                 section.contains("enabled") ? section.getBoolean("enabled") : null,
                 section.getString("webhook", null),
+                webhookUsername,
                 section.getString("message", null),
                 section.getString("require-permission", null),
                 conditions,
@@ -111,6 +120,10 @@ public class EventRule {
 
     public String getWebhook() {
         return webhook;
+    }
+
+    public String getWebhookUsername() {
+        return webhookUsername;
     }
 
     public String getMessage() {

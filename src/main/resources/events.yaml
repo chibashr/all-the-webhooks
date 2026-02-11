@@ -5,6 +5,7 @@
 defaults:
   enabled: false
   webhook: default
+  # webhook-username: "Events"   # optional Discord display name for these events
   message: generic
   require-permission: null
 
@@ -36,6 +37,12 @@ events:
 
   # player.break.block.*:
   #   message: generic_block_break
+
+  # player.death:
+  #   message: player_death
+
+  # player.death.attack.lava:
+  #   message: lava_death
 
   # entity.damage.player:
   #   message: player_damaged

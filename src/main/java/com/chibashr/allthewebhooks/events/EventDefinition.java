@@ -11,6 +11,7 @@ public class EventDefinition {
     private final List<String> wildcardExamples;
     private final String exampleYaml;
     private final EventContextBuilder<?> contextBuilder;
+    private final String parentBaseKey;
 
     public EventDefinition(
             String key,
@@ -21,6 +22,19 @@ public class EventDefinition {
             String exampleYaml,
             EventContextBuilder<?> contextBuilder
     ) {
+        this(key, category, description, predicateFields, wildcardExamples, exampleYaml, contextBuilder, null);
+    }
+
+    public EventDefinition(
+            String key,
+            String category,
+            String description,
+            Map<String, String> predicateFields,
+            List<String> wildcardExamples,
+            String exampleYaml,
+            EventContextBuilder<?> contextBuilder,
+            String parentBaseKey
+    ) {
         this.key = key;
         this.category = category;
         this.description = description;
@@ -28,6 +42,17 @@ public class EventDefinition {
         this.wildcardExamples = wildcardExamples;
         this.exampleYaml = exampleYaml;
         this.contextBuilder = contextBuilder;
+        this.parentBaseKey = parentBaseKey != null && !parentBaseKey.isEmpty() ? parentBaseKey : null;
+    }
+
+    /** True if this event is a sub-event of a base event (inherits predicates from parent). */
+    public boolean isSubEvent() {
+        return parentBaseKey != null;
+    }
+
+    /** The base event key this sub-event inherits from, or null if this is a base event. */
+    public String getParentBaseKey() {
+        return parentBaseKey;
     }
 
     public String getKey() {

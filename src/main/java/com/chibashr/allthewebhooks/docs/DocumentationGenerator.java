@@ -14,8 +14,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class DocumentationGenerator {
@@ -190,7 +188,9 @@ public class DocumentationGenerator {
         builder.append("<p>Events are grouped by category. Use the search box or sidebar to find events.</p>\n");
         Map<String, Long> categoryCounts = new LinkedHashMap<>();
         for (EventDefinition e : events) {
-            categoryCounts.merge(e.getCategory(), 1L, Long::sum);
+            if (!e.isSubEvent()) {
+                categoryCounts.merge(e.getCategory(), 1L, Long::sum);
+            }
         }
         builder.append("<ul>\n");
         for (Map.Entry<String, Long> entry : categoryCounts.entrySet()) {
@@ -198,6 +198,10 @@ public class DocumentationGenerator {
                     .append(entry.getValue()).append(" event(s)</li>\n");
         }
         builder.append("</ul>\n");
+        builder.append("<h3>Sub-events</h3>\n");
+        builder.append("<p>Some events (e.g. <code>player.death</code>, <code>entity.damage.player</code>) have <strong>sub-events</strong> ");
+        builder.append("discovered from registries and enums. Sub-events inherit predicates from their base, are shown in compact form under the base, ");
+        builder.append("and can be referenced under multiple logical groups (e.g. <code>player.death.attack.lava</code> under both <code>player.death</code> and <code>player.death.attack.*</code>).</p>\n");
         builder.append("<p class=\"meta\">Event keys are discovered at startup from Bukkit/Paper registries and enums. ");
         builder.append("Death types, damage causes, and other sub-events are scanned dynamically.</p>\n");
         builder.append("</section>\n");
@@ -232,11 +236,20 @@ public class DocumentationGenerator {
         StringBuilder builder = new StringBuilder();
         builder.append("<section id=\"message-structure\" class=\"doc-section\" data-anchor=\"message-structure\">\n");
         builder.append("<h1>Message structure</h1>\n");
-        builder.append("<p>Set <code>message: &lt;key&gt;</code> in <code>events.yaml</code>; that key is looked up under <code>messages</code> in <code>messages.yaml</code>.</p>\n");
-        builder.append("<p>The <code>content</code> template uses placeholders from each event's context fields: <code>{key}</code> in messages, <code>key:</code> in conditions. See <a class=\"inline-link\" href=\"#events\">Events</a> for available fields per event.</p>\n");
+        builder.append("<p>Event rules set <code>message: &lt;key&gt;</code>; that key is looked up in <code>messages.yaml</code>. ");
+        builder.append("The <code>content</code> template uses placeholders like <code>{player.name}</code> — each event's ");
+        builder.append("<a class=\"inline-link\" href=\"#events\">predicates</a> can be used as placeholders. ");
+        builder.append("Optional <code>username</code> per message sets the webhook display name; see <a class=\"inline-link\" href=\"#webhook-display-name\">Webhook display name</a>.</p>\n");
         builder.append("<div class=\"example-block\">\n");
         builder.append("<div class=\"example-title\">Example</div>\n");
-        builder.append("<pre>events.yaml\nentity.damage.player:\n  message: player_damaged\n\nmessages.yaml\nmessages:\n  player_damaged:\n    content: \"{player.name} took {damage.amount} damage in {world.name}\"</pre>\n");
+        builder.append("<pre>events.yaml\n");
+        builder.append("entity.damage.player:\n");
+        builder.append("  message: player_damaged\n\n");
+        builder.append("messages.yaml\n");
+        builder.append("messages:\n");
+        builder.append("  player_damaged:\n");
+        builder.append("    content: \"{player.name} took {damage.amount} damage in {world.name}\"");
+        builder.append("</pre>\n");
         builder.append("</div>\n");
         builder.append("</section>\n");
         return builder.toString();
@@ -317,6 +330,18 @@ public class DocumentationGenerator {
     }
 
     private String buildEventsContent(List<EventDefinition> events, boolean includeSectionWrapper) {
+        Map<String, EventDefinition> byKey = new LinkedHashMap<>();
+        for (EventDefinition e : events) {
+            byKey.put(e.getKey(), e);
+        }
+        List<EventDefinition> baseEvents = events.stream().filter(e -> !e.isSubEvent()).toList();
+        Map<String, List<EventDefinition>> subEventsByParent = new LinkedHashMap<>();
+        for (EventDefinition e : events) {
+            if (e.isSubEvent() && e.getParentBaseKey() != null) {
+                subEventsByParent.computeIfAbsent(e.getParentBaseKey(), k -> new ArrayList<>()).add(e);
+            }
+        }
+        Node root = buildEventTree(baseEvents);
         StringBuilder builder = new StringBuilder();
         if (includeSectionWrapper) {
             builder.append("<section id=\"events\" class=\"doc-section\" data-anchor=\"events\">\n");
@@ -327,13 +352,93 @@ public class DocumentationGenerator {
         builder.append("<p class=\"meta\">Events are resolved dynamically. Unresolvable keys are warned and ignored. ");
         builder.append("Wildcard precedence favors the most specific match, then less specific keys.</p>\n");
         builder.append("<div id=\"no-results\" class=\"no-results\" aria-live=\"polite\"></div>\n");
-        Set<String> registeredKeys = events.stream().map(EventDefinition::getKey).collect(Collectors.toSet());
-        Map<String, EventDefinition> eventMap = events.stream().collect(Collectors.toMap(EventDefinition::getKey, e -> e));
-        Node root = buildEventTree(events);
-        builder.append(buildEventsContentFromNode(root, eventMap, registeredKeys, 0));
+        builder.append(buildNestedEventContent(root, "", byKey, subEventsByParent));
         if (includeSectionWrapper) {
             builder.append("</section>\n");
         }
+        return builder.toString();
+    }
+
+    private Node buildEventTree(List<EventDefinition> events) {
+        Node root = new Node("");
+        for (EventDefinition event : events) {
+            String[] parts = event.getKey().split("\\.");
+            Node current = root;
+            for (String part : parts) {
+                current = current.children.computeIfAbsent(part, Node::new);
+            }
+            current.eventKey = event.getKey();
+        }
+        return root;
+    }
+
+    private String buildNestedEventContent(Node node, String pathPrefix, Map<String, EventDefinition> byKey,
+            Map<String, List<EventDefinition>> subEventsByParent) {
+        StringBuilder builder = new StringBuilder();
+        String segmentPath = pathPrefix.isEmpty() ? node.name : (pathPrefix + "." + node.name);
+        if (node.eventKey != null) {
+            EventDefinition event = byKey.get(node.eventKey);
+            if (event != null) {
+                builder.append(buildEventEntry(event, byKey, subEventsByParent));
+            }
+        }
+        if (!node.children.isEmpty()) {
+            for (Node child : node.children.values()) {
+                builder.append("<div class=\"event-nest\">");
+                builder.append(buildNestedEventContent(child, segmentPath, byKey, subEventsByParent));
+                builder.append("</div>");
+            }
+        }
+        return builder.toString();
+    }
+
+    private String buildSubEventsSection(String parentKey, List<EventDefinition> subEvents,
+            Map<String, EventDefinition> byKey) {
+        if (subEvents == null || subEvents.isEmpty()) {
+            return "";
+        }
+        Map<String, List<EventDefinition>> byGroup = new LinkedHashMap<>();
+        int prefixLen = parentKey.length() + 1;
+        for (EventDefinition sub : subEvents) {
+            String suffix = sub.getKey().substring(prefixLen);
+            String group = suffix.contains(".") ? suffix.substring(0, suffix.indexOf('.')) : "";
+            byGroup.computeIfAbsent(group, k -> new ArrayList<>()).add(sub);
+        }
+        for (List<EventDefinition> groupList : byGroup.values()) {
+            groupList.sort(Comparator.comparing(EventDefinition::getKey));
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append("<div class=\"event-section sub-events-section\">");
+        builder.append("<h3>Sub-events</h3>");
+        builder.append("<p class=\"meta\">Inherit predicates from <code>").append(HtmlEscaper.escape(parentKey)).append("</code>. ");
+        builder.append("Discovered from registries/enums; shown in compact form.</p>");
+        for (Map.Entry<String, List<EventDefinition>> entry : byGroup.entrySet()) {
+            String groupLabel = entry.getKey();
+            boolean useDetails = byGroup.size() > 1;
+            if (useDetails) {
+                builder.append("<details class=\"sub-event-group\"><summary>").append(HtmlEscaper.escape(groupLabel)).append("</summary>");
+            } else {
+                builder.append("<div class=\"sub-event-group\">");
+            }
+            builder.append("<ul class=\"sub-event-list\">");
+            for (EventDefinition sub : entry.getValue()) {
+                builder.append(buildSubEventCompactRef(sub, parentKey));
+            }
+            builder.append("</ul>");
+            builder.append(useDetails ? "</details>" : "</div>");
+        }
+        builder.append("</div>");
+        return builder.toString();
+    }
+
+    private String buildSubEventCompactRef(EventDefinition sub, String parentKey) {
+        String key = sub.getKey();
+        StringBuilder builder = new StringBuilder();
+        builder.append("<li id=\"").append(HtmlEscaper.escape(key)).append("\" class=\"sub-event-ref\" data-search=\"")
+                .append(HtmlEscaper.escape(buildSearchIndex(sub))).append("\">");
+        builder.append("<code>").append(HtmlEscaper.escape(key)).append("</code>");
+        builder.append(" <span class=\"meta\">— ").append(HtmlEscaper.escape(sub.getDescription())).append("</span>");
+        builder.append("</li>");
         return builder.toString();
     }
 
@@ -425,6 +530,15 @@ public class DocumentationGenerator {
         builder.append("  padding-bottom: var(--space-4);\n");
         builder.append("  border-bottom: 1px solid var(--border);\n");
         builder.append("}\n");
+        builder.append(".event-nest { margin-left: var(--space-4); border-left: 2px solid var(--border); padding-left: var(--space-3); }\n");
+        builder.append(".sub-events-section { border-top: 1px dashed var(--border); margin-top: var(--space-3); padding-top: var(--space-3); }\n");
+        builder.append(".sub-event-group { margin-top: var(--space-2); }\n");
+        builder.append(".sub-event-group summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }\n");
+        builder.append(".sub-event-list { list-style: none; padding-left: var(--space-3); margin: var(--space-2) 0; }\n");
+        builder.append(".sub-event-ref { padding: var(--space-1) 0; font-size: 0.9rem; border-bottom: 1px solid transparent; }\n");
+        builder.append(".sub-event-ref code { font-size: 0.85rem; }\n");
+        builder.append(".predicate-list li { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); align-items: center; }\n");
+        builder.append(".predicate-msg, .predicate-cond { font-size: 0.95em; }\n");
         builder.append(".event-section { margin-top: var(--space-3); }\n");
         builder.append("code, pre {\n");
         builder.append("  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, \"Liberation Mono\", monospace;\n");
@@ -455,12 +569,6 @@ public class DocumentationGenerator {
         builder.append("}\n");
         builder.append(".example-title { font-weight: 600; margin-bottom: var(--space-2); }\n");
         builder.append(".inline-link { color: var(--accent); }\n");
-        builder.append(".predicate-table { width: 100%; border-collapse: collapse; margin-top: var(--space-2); }\n");
-        builder.append(".predicate-table th, .predicate-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }\n");
-        builder.append(".predicate-table th { color: var(--muted); font-weight: 500; font-size: 0.85rem; }\n");
-        builder.append(".predicate-table code { font-size: 0.9em; }\n");
-        builder.append(".event-group { margin-left: var(--space-3); margin-top: var(--space-3); padding-left: var(--space-3); border-left: 2px solid var(--border); }\n");
-        builder.append(".inherits-meta { font-style: italic; margin-bottom: var(--space-2); }\n");
         return builder.toString();
     }
 
@@ -552,38 +660,10 @@ public class DocumentationGenerator {
         return builder.toString();
     }
 
-    private String buildEventsContentFromNode(Node node, Map<String, EventDefinition> eventMap,
-            Set<String> registeredKeys, int depth) {
-        StringBuilder builder = new StringBuilder();
-        int headingLevel = Math.min(2 + depth, 6);
-        String tag = "h" + headingLevel;
-        if (node.eventKey != null) {
-            EventDefinition event = eventMap.get(node.eventKey);
-            if (event != null) {
-                builder.append(buildEventEntry(event, registeredKeys, headingLevel));
-            }
-        }
-        if (!node.children.isEmpty()) {
-            boolean renderGroupHeading = depth > 0 && node.eventKey == null;
-            if (renderGroupHeading) {
-                builder.append("<").append(tag).append(">").append(HtmlEscaper.escape(node.name)).append("</").append(tag).append(">");
-            }
-            if (depth > 0) {
-                builder.append("<div class=\"event-group\">");
-            }
-            for (Node child : node.children.values()) {
-                builder.append(buildEventsContentFromNode(child, eventMap, registeredKeys, depth + 1));
-            }
-            if (depth > 0) {
-                builder.append("</div>");
-            }
-        }
-        return builder.toString();
-    }
-
-    private Node buildEventTree(List<EventDefinition> events) {
+    private String buildNavigation(List<EventDefinition> events) {
+        List<EventDefinition> baseEvents = events.stream().filter(e -> !e.isSubEvent()).toList();
         Node root = new Node("");
-        for (EventDefinition event : events) {
+        for (EventDefinition event : baseEvents) {
             String[] parts = event.getKey().split("\\.");
             Node current = root;
             for (String part : parts) {
@@ -591,11 +671,6 @@ public class DocumentationGenerator {
             }
             current.eventKey = event.getKey();
         }
-        return root;
-    }
-
-    private String buildNavigation(List<EventDefinition> events) {
-        Node root = buildEventTree(events);
         StringBuilder builder = new StringBuilder();
         builder.append(buildNode(root));
         return builder.toString();
@@ -623,20 +698,25 @@ public class DocumentationGenerator {
         return builder.toString();
     }
 
-    private String buildEventEntry(EventDefinition event, Set<String> registeredKeys) {
-        return buildEventEntry(event, registeredKeys, 2);
-    }
-
-    private String buildEventEntry(EventDefinition event, Set<String> registeredKeys, int headingLevel) {
-        String tag = "h" + Math.min(Math.max(headingLevel, 2), 6);
+    private String buildEventEntry(EventDefinition event, Map<String, EventDefinition> byKey,
+            Map<String, List<EventDefinition>> subEventsByParent) {
         StringBuilder builder = new StringBuilder();
+        StringBuilder searchIndex = new StringBuilder(buildSearchIndex(event));
+        List<EventDefinition> subEventsForSearch = subEventsByParent.get(event.getKey());
+        if (subEventsForSearch != null) {
+            for (EventDefinition sub : subEventsForSearch) {
+                searchIndex.append(" ").append(buildSearchIndex(sub));
+            }
+        }
         builder.append("<div class=\"event-entry\" id=\"").append(HtmlEscaper.escape(event.getKey())).append("\"");
         builder.append(" data-anchor=\"").append(HtmlEscaper.escape(event.getKey())).append("\"");
-        builder.append(" data-search=\"").append(HtmlEscaper.escape(buildSearchIndex(event))).append("\">");
-        builder.append("<").append(tag).append(">").append(HtmlEscaper.escape(event.getKey())).append("</").append(tag).append(">");
-        String parentKey = findParentKey(event.getKey(), registeredKeys);
-        if (parentKey != null) {
-            builder.append("<div class=\"inherits-meta meta\">Inherits from <a href=\"#").append(HtmlEscaper.escape(parentKey)).append("\">").append(HtmlEscaper.escape(parentKey)).append("</a>.</div>");
+        builder.append(" data-search=\"").append(HtmlEscaper.escape(searchIndex.toString())).append("\">");
+        builder.append("<h2>").append(HtmlEscaper.escape(event.getKey())).append("</h2>");
+        if (!event.isSubEvent()) {
+            String parentKey = findParentEventKey(event.getKey(), byKey);
+            if (parentKey != null) {
+                builder.append("<div class=\"meta\">(Inherits from ").append(HtmlEscaper.escape(parentKey)).append(")</div>");
+            }
         }
         builder.append("<div class=\"meta\">Category: ").append(HtmlEscaper.escape(event.getCategory())).append("</div>");
         builder.append("<p>").append(HtmlEscaper.escape(event.getDescription())).append("</p>");
@@ -649,15 +729,17 @@ public class DocumentationGenerator {
             builder.append("</div>");
         }
         builder.append("<div class=\"event-section\">");
-        builder.append("<h3>Context fields</h3>");
-        builder.append("<table class=\"predicate-table\">");
-        builder.append("<thead><tr><th>In messages</th><th>In conditions</th><th>Description</th></tr></thead><tbody>");
+        builder.append("<h3>Predicates</h3>");
+        builder.append("<p>Use in messages with <code>{key}</code> or in conditions as <code>key:</code>:</p>");
+        builder.append("<ul class=\"predicate-list\">");
         for (Map.Entry<String, String> entry : event.getPredicateFields().entrySet()) {
-            builder.append("<tr><td><code>{").append(HtmlEscaper.escape(entry.getKey()))
-                    .append("}</code></td><td><code>").append(HtmlEscaper.escape(entry.getKey()))
-                    .append(":</code></td><td class=\"meta\">").append(HtmlEscaper.escape(entry.getValue())).append("</td></tr>");
+            builder.append("<li><span class=\"predicate-msg\">In messages: <code>{")
+                    .append(HtmlEscaper.escape(entry.getKey())).append("}</code></span>")
+                    .append(" <span class=\"predicate-cond\">In conditions: <code>")
+                    .append(HtmlEscaper.escape(entry.getKey())).append(":</code></span>")
+                    .append(" <span class=\"meta\">").append(HtmlEscaper.escape(entry.getValue())).append("</span></li>");
         }
-        builder.append("</tbody></table>");
+        builder.append("</ul>");
         builder.append("</div>");
         builder.append("<div class=\"event-section\">");
         builder.append("<h3>Wildcard support</h3>");
@@ -670,18 +752,22 @@ public class DocumentationGenerator {
         builder.append("<h3>events.yaml example</h3>");
         builder.append("<pre>").append(HtmlEscaper.escape(event.getExampleYaml())).append("</pre>");
         builder.append("</div>");
+        List<EventDefinition> subEvents = subEventsByParent.get(event.getKey());
+        if (subEvents != null && !subEvents.isEmpty()) {
+            builder.append(buildSubEventsSection(event.getKey(), subEvents, byKey));
+        }
         builder.append("</div>");
         return builder.toString();
     }
 
-    private String findParentKey(String eventKey, Set<String> registeredKeys) {
+    private String findParentEventKey(String eventKey, Map<String, EventDefinition> byKey) {
         int lastDot = eventKey.lastIndexOf('.');
         while (lastDot > 0) {
-            String prefix = eventKey.substring(0, lastDot);
-            if (registeredKeys.contains(prefix)) {
-                return prefix;
+            String candidate = eventKey.substring(0, lastDot);
+            if (byKey.containsKey(candidate)) {
+                return candidate;
             }
-            lastDot = eventKey.lastIndexOf('.', lastDot - 1);
+            lastDot = candidate.lastIndexOf('.');
         }
         return null;
     }
@@ -714,6 +800,9 @@ public class DocumentationGenerator {
             builder.append("{");
             builder.append("\"event\":\"").append(JsonEscaper.escape(event.getKey())).append("\",");
             builder.append("\"category\":\"").append(JsonEscaper.escape(event.getCategory())).append("\",");
+            if (event.isSubEvent() && event.getParentBaseKey() != null) {
+                builder.append("\"parent_base_key\":\"").append(JsonEscaper.escape(event.getParentBaseKey())).append("\",");
+            }
             builder.append("\"description\":\"").append(JsonEscaper.escape(event.getDescription())).append("\",");
             builder.append("\"predicates\":{");
             boolean firstPredicate = true;

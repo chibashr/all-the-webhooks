@@ -112,7 +112,8 @@ public final class SubEventDiscovery {
                     predicateMap,
                     wildcards,
                     example,
-                    null
+                    null,
+                    "player.death"
             );
             registry.addDiscoveredDefinition(def);
         }
@@ -143,7 +144,8 @@ public final class SubEventDiscovery {
                     predicateMap,
                     wildcards,
                     example,
-                    null
+                    null,
+                    "entity.damage.player"
             );
             registry.addDiscoveredDefinition(def);
         }

@@ -23,6 +23,8 @@ When a player dies or takes damage, the context builder emits the most specific 
 
 **DeathMessageKeyResolver** extracts the Minecraft death message key from `EntityDeathEvent.getDamageSource()` and builds the event key for routing.
 
+**EventDefinition metadata for sub-events:** Sub-events set `parentBaseKey` (the base event they inherit from). Use `isSubEvent()` and `getParentBaseKey()` to style or group them in documentation, so sub-events appear in compact form under their base without duplicating full entries.
+
 ## Event rule nesting
 
 `events.yaml` supports nested sections, but only leaf sections that contain rule fields (`message`, `webhook`, `enabled`, `require-permission`, `conditions`, `rate-limit`) are registered as rules. This prevents parent grouping nodes (like `events.player`) from matching every `player.*` event when only `events.player.join` is intended.

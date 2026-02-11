@@ -571,11 +571,13 @@ public class EventRegistry {
         if (base == null) {
             return null;
         }
+        String baseKey = base.getKey();
         String category = base.getCategory();
-        String description = "Derived from " + base.getKey() + ".";
+        String description = "Derived from " + baseKey + ".";
         Map<String, String> predicates = base.getPredicateFields();
         List<String> wildcards = base.getWildcardExamples();
         String example = key + ":\n  message: generic";
+        String parentBaseKey = key.startsWith(baseKey + ".") ? baseKey : null;
         return new EventDefinition(
                 key,
                 category,
@@ -583,7 +585,8 @@ public class EventRegistry {
                 predicates,
                 wildcards,
                 example,
-                null
+                null,
+                parentBaseKey
         );
     }
 

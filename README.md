@@ -19,7 +19,7 @@ A **Paper-** and **Folia-** compatible Minecraft plugin that forwards **in-game 
 1. **Event discovery** — The plugin discovers Bukkit/Paper event classes and builds dot-notation keys. When an event fires, it builds an **event context** (key + key/value map from the event). Context enrichment adds fields from entities in scope (World, Player, Block)—e.g. `world.environment` is available for `player.death`.
 2. **Rule resolution** — For each event, the plugin finds the best-matching rule in `events.yaml` (exact match, then more specific wildcards). Optional world overrides apply.
 3. **Checks** — Rule enabled, optional permission, conditions (e.g. `equals`, `greater-than`), and rate limiting are applied.
-4. **Message** — The chosen template from `messages.yaml` is filled with placeholders (e.g. `{player.name}`) and optional transforms (`{key|regex:pattern:replacement}`, `{key|map:true:hardcore:false:normal}`). Redaction is applied to configured fields.
+4. **Message** — The chosen template from `messages.yaml` is filled with placeholders (e.g. `{player.name}`) and optional transforms (e.g. `{key|lower}`, `{key|default:N/A}`, `{key|map:true:hardcore:false:normal}`, `{key|regex:pattern:replacement}`). Transforms can be chained with `|`. Redaction is applied to configured fields.
 5. **Dispatch** — A JSON payload is sent to the webhook URL via HTTP POST, asynchronously and with configurable rate limits.
 
 ---
@@ -67,7 +67,7 @@ Docs are **offline-first**: no hosted site or internet required. Open `docs.html
 
 - **config.yaml** — Webhook URLs and timeouts, global rate limit, async/Folia, redaction fields, logging and doc generation options, command permissions.
 - **events.yaml** — Defaults (enabled, webhook, message, permission), optional world overrides, and event rules: event key (or wildcard) → message template, conditions, optional permission.
-- **messages.yaml** — Named message templates with `{placeholder}` (including context-enriched fields like `{world.environment}`) and optional transforms (`{key|regex:pattern:replacement}`, `{key|map:key1:value1:key2:value2}`).
+- **messages.yaml** — Named message templates with `{placeholder}` (including context-enriched fields) and optional transforms (trim, lower, upper, default, truncate, replace, last-path-segment, map, regex). Transforms chain with `|`.
 
 ---
 

@@ -2,6 +2,7 @@ package com.chibashr.allthewebhooks.util;
 
 import com.chibashr.allthewebhooks.config.PluginConfig;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -14,8 +15,6 @@ import java.util.regex.Pattern;
 
 public final class MessageResolver {
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{([^}]+)\\}");
-    private static final String REGEX_PREFIX = "regex:";
-    private static final String MAP_PREFIX = "map:";
     private static final long REGEX_TIMEOUT_MS = 300;
 
     private static final ExecutorService REGEX_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
@@ -23,6 +22,52 @@ public final class MessageResolver {
         t.setDaemon(true);
         return t;
     });
+
+    /** Interface for transforms: apply(value, args) -> result. */
+    @FunctionalInterface
+    interface ValueTransform {
+        String apply(String value, List<String> args);
+    }
+
+    private static final Map<String, ValueTransform> TRANSFORM_REGISTRY = new LinkedHashMap<>();
+
+    static {
+        TRANSFORM_REGISTRY.put("trim", (v, a) -> v.trim());
+        TRANSFORM_REGISTRY.put("lower", (v, a) -> v.toLowerCase());
+        TRANSFORM_REGISTRY.put("upper", (v, a) -> v.toUpperCase());
+        TRANSFORM_REGISTRY.put("default", (v, a) -> (v == null || v.isEmpty()) && !a.isEmpty() ? a.get(0) : v);
+        TRANSFORM_REGISTRY.put("truncate", (v, a) -> {
+            if (a.isEmpty()) return v;
+            try {
+                int max = Integer.parseInt(a.get(0));
+                if (max < 0) return v;
+                return v.length() <= max ? v : v.substring(0, max);
+            } catch (NumberFormatException e) {
+                return v;
+            }
+        });
+        TRANSFORM_REGISTRY.put("replace", (v, a) -> {
+            if (a.size() < 2) return v;
+            return v.replace(a.get(0), a.get(1));
+        });
+        TRANSFORM_REGISTRY.put("last-path-segment", (v, a) -> {
+            if (v == null || v.isEmpty()) return v;
+            int last = v.lastIndexOf('/');
+            return last < 0 ? v : v.substring(last + 1);
+        });
+        TRANSFORM_REGISTRY.put("first-path-segment", (v, a) -> {
+            if (v == null || v.isEmpty()) return v;
+            int first = v.indexOf('/');
+            return first < 0 ? v : v.substring(0, first);
+        });
+        TRANSFORM_REGISTRY.put("map", (v, a) -> {
+            if (a.size() % 2 != 0) return v;
+            for (int i = 0; i < a.size() - 1; i += 2) {
+                if (v.equals(a.get(i))) return a.get(i + 1);
+            }
+            return v;
+        });
+    }
 
     private MessageResolver() {
     }
@@ -56,16 +101,12 @@ public final class MessageResolver {
                 replacement = "[REDACTED]";
             } else {
                 Object value = context.get(key);
-                if (value == null) {
-                    replacement = "";
-                    if (pluginConfig.shouldValidate()) {
-                        warningTracker.warnOnce("missing-placeholder:" + key,
-                                "Missing placeholder value for {" + key + "}");
-                    }
-                } else {
-                    String raw = String.valueOf(value);
-                    replacement = applyTransforms(raw, transformSpec, key, warningTracker);
+                if (value == null && pluginConfig.shouldValidate()) {
+                    warningTracker.warnOnce("missing-placeholder:" + key,
+                            "Missing placeholder value for {" + key + "}");
                 }
+                String raw = value == null ? "" : String.valueOf(value);
+                replacement = applyTransforms(raw, transformSpec, key, warningTracker);
             }
             matcher.appendReplacement(buffer, Matcher.quoteReplacement(replacement));
         }
@@ -95,23 +136,37 @@ public final class MessageResolver {
     }
 
     private static String applySingleTransform(String value, String spec, String key, WarningTracker warningTracker) {
-        if (spec.startsWith(REGEX_PREFIX)) {
-            return applyRegexTransform(value, spec, key, warningTracker);
+        TransformSpec parsed = parseTransformSpec(spec);
+        if (parsed == null) {
+            return value;
         }
-        if (spec.startsWith(MAP_PREFIX)) {
-            return applyMapTransform(value, spec, key, warningTracker);
+        if ("regex".equals(parsed.name)) {
+            return applyRegexTransform(value, parsed.args, key, warningTracker);
         }
-        return value;
-    }
-
-    private static String applyRegexTransform(String value, String spec, String key, WarningTracker warningTracker) {
-        RegexSpec regexSpec = parseRegexSpec(spec);
-        if (regexSpec == null) {
+        ValueTransform transform = TRANSFORM_REGISTRY.get(parsed.name);
+        if (transform == null) {
             return value;
         }
         try {
-            Pattern pattern = Pattern.compile(regexSpec.pattern);
-            Callable<String> task = () -> pattern.matcher(value).replaceAll(regexSpec.replacement);
+            return transform.apply(value, parsed.args);
+        } catch (Exception e) {
+            if (warningTracker != null) {
+                warningTracker.warnOnce("placeholder-transform-error:" + key + ":" + parsed.name,
+                        "Transform " + parsed.name + " failed for placeholder {" + key + "}: " + e.getMessage() + ", using untransformed value");
+            }
+            return value;
+        }
+    }
+
+    private static String applyRegexTransform(String value, List<String> args, String key, WarningTracker warningTracker) {
+        if (args.size() < 2) {
+            return value;
+        }
+        String pattern = args.get(0);
+        String replacement = args.get(1);
+        try {
+            Pattern p = Pattern.compile(pattern);
+            Callable<String> task = () -> p.matcher(value).replaceAll(replacement);
             return REGEX_EXECUTOR.submit(task).get(REGEX_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             if (warningTracker != null) {
@@ -128,17 +183,32 @@ public final class MessageResolver {
         }
     }
 
-    private static String applyMapTransform(String value, String spec, String key, WarningTracker warningTracker) {
-        List<String> pairs = parseMapSpec(spec);
-        if (pairs == null) {
-            return value;
+    /** Parsed transform: name and args. For regex, args = [pattern, replacement]. */
+    static final class TransformSpec {
+        final String name;
+        final List<String> args;
+
+        TransformSpec(String name, List<String> args) {
+            this.name = name;
+            this.args = args;
         }
-        for (int i = 0; i < pairs.size() - 1; i += 2) {
-            if (value.equals(pairs.get(i))) {
-                return pairs.get(i + 1);
-            }
+    }
+
+    /**
+     * Parses "name" or "name:arg1:arg2:..." into TransformSpec. First unescaped colon separates name from args;
+     * args are split by unescaped colon. Use \: for literal colon.
+     */
+    static TransformSpec parseTransformSpec(String spec) {
+        if (spec == null || spec.isEmpty()) {
+            return null;
         }
-        return value;
+        int colonIndex = findFirstUnescapedColon(spec);
+        if (colonIndex < 0) {
+            return new TransformSpec(spec.trim(), List.of());
+        }
+        String name = unescape(spec.substring(0, colonIndex)).trim();
+        String rest = spec.substring(colonIndex + 1);
+        return new TransformSpec(name, splitByUnescapedColon(rest));
     }
 
     /**
@@ -177,39 +247,6 @@ public final class MessageResolver {
             }
         }
         return sb.toString();
-    }
-
-    /**
-     * Parses "regex:pattern:replacement" with \: escaping in pattern and replacement.
-     * Returns null if the spec is invalid (e.g. no unescaped colon to separate pattern and replacement).
-     */
-    static RegexSpec parseRegexSpec(String transformSpec) {
-        if (transformSpec == null || !transformSpec.startsWith(REGEX_PREFIX)) {
-            return null;
-        }
-        String rest = transformSpec.substring(REGEX_PREFIX.length());
-        int colonIndex = findFirstUnescapedColon(rest);
-        if (colonIndex < 0) {
-            return null;
-        }
-        String pattern = unescape(rest.substring(0, colonIndex));
-        String replacement = unescape(rest.substring(colonIndex + 1));
-        return new RegexSpec(pattern, replacement);
-    }
-
-    /**
-     * Parses "map:key1:value1:key2:value2:..." with \: escaping. Returns null if invalid (odd number of parts).
-     */
-    static List<String> parseMapSpec(String transformSpec) {
-        if (transformSpec == null || !transformSpec.startsWith(MAP_PREFIX)) {
-            return null;
-        }
-        String rest = transformSpec.substring(MAP_PREFIX.length());
-        List<String> parts = splitByUnescapedColon(rest);
-        if (parts.size() % 2 != 0) {
-            return null;
-        }
-        return parts;
     }
 
     private static List<String> splitByUnescapedColon(String s) {
@@ -264,13 +301,4 @@ public final class MessageResolver {
         return sb.toString();
     }
 
-    static final class RegexSpec {
-        final String pattern;
-        final String replacement;
-
-        RegexSpec(String pattern, String replacement) {
-            this.pattern = pattern;
-            this.replacement = replacement;
-        }
-    }
 }

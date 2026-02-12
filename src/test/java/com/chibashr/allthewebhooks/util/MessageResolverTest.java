@@ -151,7 +151,7 @@ class MessageResolverTest {
     }
 
     @Test
-    void resolve_missingPlaceholderWithRegex_emptyString() {
+    void resolve_missingPlaceholderWithRegex_appliedToEmpty() {
         String result = MessageResolver.resolve(
                 "X{missing|regex:.*:y}Z",
                 Map.of(),
@@ -159,7 +159,7 @@ class MessageResolverTest {
                 warningTracker,
                 PluginConfig.builder().build()
         );
-        assertEquals("XZ", result);
+        assertEquals("XyZ", result);
     }
 
     @Test
@@ -175,21 +175,27 @@ class MessageResolverTest {
     }
 
     @Test
-    void parseRegexSpec_escapedColon_preservedInPatternAndReplacement() {
-        MessageResolver.RegexSpec spec = MessageResolver.parseRegexSpec("regex:foo\\:bar:baz\\:qux");
+    void parseTransformSpec_escapedColon_preservedInRegexArgs() {
+        MessageResolver.TransformSpec spec = MessageResolver.parseTransformSpec("regex:foo\\:bar:baz\\:qux");
         assertNotNull(spec);
-        assertEquals("foo:bar", spec.pattern);
-        assertEquals("baz:qux", spec.replacement);
+        assertEquals("regex", spec.name);
+        assertEquals(java.util.List.of("foo:bar", "baz:qux"), spec.args);
     }
 
     @Test
-    void parseRegexSpec_noColon_returnsNull() {
-        assertNull(MessageResolver.parseRegexSpec("regex:noColonHere"));
+    void parseTransformSpec_noArgs_nameOnly() {
+        MessageResolver.TransformSpec spec = MessageResolver.parseTransformSpec("trim");
+        assertNotNull(spec);
+        assertEquals("trim", spec.name);
+        assertEquals(java.util.List.of(), spec.args);
     }
 
     @Test
-    void parseRegexSpec_notRegexPrefix_returnsNull() {
-        assertNull(MessageResolver.parseRegexSpec("other:foo:bar"));
+    void parseTransformSpec_otherName_parsed() {
+        MessageResolver.TransformSpec spec = MessageResolver.parseTransformSpec("other:foo:bar");
+        assertNotNull(spec);
+        assertEquals("other", spec.name);
+        assertEquals(java.util.List.of("foo", "bar"), spec.args);
     }
 
     @Test
@@ -253,20 +259,19 @@ class MessageResolverTest {
     }
 
     @Test
-    void parseMapSpec_validPairs_returnsList() {
-        java.util.List<String> pairs = MessageResolver.parseMapSpec("map:true:hardcore:false:normal");
-        assertNotNull(pairs);
-        assertEquals(java.util.List.of("true", "hardcore", "false", "normal"), pairs);
+    void parseTransformSpec_mapValidArgs() {
+        MessageResolver.TransformSpec spec = MessageResolver.parseTransformSpec("map:true:hardcore:false:normal");
+        assertNotNull(spec);
+        assertEquals("map", spec.name);
+        assertEquals(java.util.List.of("true", "hardcore", "false", "normal"), spec.args);
     }
 
     @Test
-    void parseMapSpec_oddParts_returnsNull() {
-        assertNull(MessageResolver.parseMapSpec("map:true:hardcore:false"));
-    }
-
-    @Test
-    void parseMapSpec_notMapPrefix_returnsNull() {
-        assertNull(MessageResolver.parseMapSpec("regex:foo:bar"));
+    void parseTransformSpec_regexArgs() {
+        MessageResolver.TransformSpec spec = MessageResolver.parseTransformSpec("regex:foo:bar");
+        assertNotNull(spec);
+        assertEquals("regex", spec.name);
+        assertEquals(java.util.List.of("foo", "bar"), spec.args);
     }
 
     @Test
@@ -283,11 +288,12 @@ class MessageResolverTest {
     }
 
     @Test
-    void parseMapSpec_escapedColonInKey_preservesColon() {
-        java.util.List<String> pairs = MessageResolver.parseMapSpec("map:foo\\:bar:baz");
-        assertNotNull(pairs);
-        assertEquals("foo:bar", pairs.get(0));
-        assertEquals("baz", pairs.get(1));
+    void parseTransformSpec_escapedColonInMapArgs_preservesColon() {
+        MessageResolver.TransformSpec spec = MessageResolver.parseTransformSpec("map:foo\\:bar:baz");
+        assertNotNull(spec);
+        assertEquals("map", spec.name);
+        assertEquals("foo:bar", spec.args.get(0));
+        assertEquals("baz", spec.args.get(1));
     }
 
     @Test
@@ -300,5 +306,137 @@ class MessageResolverTest {
                 PluginConfig.builder().build()
         );
         assertEquals("Val: baz", result);
+    }
+
+    @Test
+    void resolve_trim_removesWhitespace() {
+        String result = MessageResolver.resolve(
+                "[{key|trim}]",
+                Map.of("key", "  hello  "),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("[hello]", result);
+    }
+
+    @Test
+    void resolve_lower_lowercases() {
+        String result = MessageResolver.resolve(
+                "{key|lower}",
+                Map.of("key", "HELLO"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("hello", result);
+    }
+
+    @Test
+    void resolve_upper_uppercases() {
+        String result = MessageResolver.resolve(
+                "{key|upper}",
+                Map.of("key", "hello"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("HELLO", result);
+    }
+
+    @Test
+    void resolve_default_emptyUsesFallback() {
+        String result = MessageResolver.resolve(
+                "{key|default:N/A}",
+                Map.of("key", ""),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("N/A", result);
+    }
+
+    @Test
+    void resolve_default_missingUsesFallback() {
+        String result = MessageResolver.resolve(
+                "{missing|default:Unknown}",
+                Map.of(),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("Unknown", result);
+    }
+
+    @Test
+    void resolve_truncate_limitsLength() {
+        String result = MessageResolver.resolve(
+                "[{key|truncate:5}]",
+                Map.of("key", "hello world"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("[hello]", result);
+    }
+
+    @Test
+    void resolve_replace_literalReplace() {
+        String result = MessageResolver.resolve(
+                "{key|replace:foo:bar}",
+                Map.of("key", "foofoo"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("barbar", result);
+    }
+
+    @Test
+    void resolve_lastPathSegment_extractsLast() {
+        String result = MessageResolver.resolve(
+                "{key|last-path-segment}",
+                Map.of("key", "2026/02/hardcore-26/world"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("world", result);
+    }
+
+    @Test
+    void resolve_firstPathSegment_extractsFirst() {
+        String result = MessageResolver.resolve(
+                "{key|first-path-segment}",
+                Map.of("key", "2026/02/hardcore-26/world"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("2026", result);
+    }
+
+    @Test
+    void resolve_chainedtrimLowerDefault() {
+        String result = MessageResolver.resolve(
+                "[{key|trim|lower|default:none}]",
+                Map.of("key", "  HELLO  "),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("[hello]", result);
+    }
+
+    @Test
+    void resolve_chainedLastPathSegmentThenUpper() {
+        String result = MessageResolver.resolve(
+                "{key|last-path-segment|upper}",
+                Map.of("key", "path/to/world"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("WORLD", result);
     }
 }

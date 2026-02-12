@@ -191,8 +191,11 @@ class DocumentationGeneratorTest {
         assertTrue(content.contains("id=\"placeholder-transforms\"") || content.contains("data-anchor=\"placeholder-transforms\""),
                 "docs.html should have placeholder transforms section");
         assertTrue(content.contains("<h1>Placeholder transforms</h1>"));
-        assertTrue(content.contains("regex:pattern:replacement"));
-        assertTrue(content.contains("map:key1:value1"));
+        assertTrue(content.contains("regex"));
+        assertTrue(content.contains("key1:value1"));
         assertTrue(content.contains("hardcore-26"), "Regex example should show hardcore-26");
+        assertTrue(content.contains("one after the other"), "Should explain chaining");
+        assertTrue(content.contains("trim"), "Should document trim transform");
+        assertTrue(content.contains("last-path-segment"), "Should document path segment transform");
     }
 }

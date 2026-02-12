@@ -191,4 +191,114 @@ class MessageResolverTest {
     void parseRegexSpec_notRegexPrefix_returnsNull() {
         assertNull(MessageResolver.parseRegexSpec("other:foo:bar"));
     }
+
+    @Test
+    void resolve_mapTransform_trueToHardcore() {
+        String result = MessageResolver.resolve(
+                "Mode: {world.hardcore|map:true:hardcore:false:normal}",
+                Map.of("world.hardcore", "true"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("Mode: hardcore", result);
+    }
+
+    @Test
+    void resolve_mapTransform_falseToNormal() {
+        String result = MessageResolver.resolve(
+                "Mode: {world.hardcore|map:true:hardcore:false:normal}",
+                Map.of("world.hardcore", "false"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("Mode: normal", result);
+    }
+
+    @Test
+    void resolve_mapTransform_noMatch_unchanged() {
+        String result = MessageResolver.resolve(
+                "Mode: {world.hardcore|map:true:hardcore:false:normal}",
+                Map.of("world.hardcore", "unknown"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("Mode: unknown", result);
+    }
+
+    @Test
+    void resolve_chainedRegexTransforms_trueFalseToHardcoreNormal() {
+        String result = MessageResolver.resolve(
+                "Mode: {key|regex:^true$:hardcore|regex:^false$:normal}",
+                Map.of("key", "true"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("Mode: hardcore", result);
+    }
+
+    @Test
+    void resolve_chainedRegexTransforms_falseToNormal() {
+        String result = MessageResolver.resolve(
+                "Mode: {key|regex:^true$:hardcore|regex:^false$:normal}",
+                Map.of("key", "false"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("Mode: normal", result);
+    }
+
+    @Test
+    void parseMapSpec_validPairs_returnsList() {
+        java.util.List<String> pairs = MessageResolver.parseMapSpec("map:true:hardcore:false:normal");
+        assertNotNull(pairs);
+        assertEquals(java.util.List.of("true", "hardcore", "false", "normal"), pairs);
+    }
+
+    @Test
+    void parseMapSpec_oddParts_returnsNull() {
+        assertNull(MessageResolver.parseMapSpec("map:true:hardcore:false"));
+    }
+
+    @Test
+    void parseMapSpec_notMapPrefix_returnsNull() {
+        assertNull(MessageResolver.parseMapSpec("regex:foo:bar"));
+    }
+
+    @Test
+    void splitByUnescapedPipe_singleTransform_noSplit() {
+        assertEquals(java.util.List.of("regex:^true$:hardcore"), MessageResolver.splitByUnescapedPipe("regex:^true$:hardcore"));
+    }
+
+    @Test
+    void splitByUnescapedPipe_twoTransforms_splits() {
+        assertEquals(
+                java.util.List.of("regex:^true$:hardcore", "regex:^false$:normal"),
+                MessageResolver.splitByUnescapedPipe("regex:^true$:hardcore|regex:^false$:normal")
+        );
+    }
+
+    @Test
+    void parseMapSpec_escapedColonInKey_preservesColon() {
+        java.util.List<String> pairs = MessageResolver.parseMapSpec("map:foo\\:bar:baz");
+        assertNotNull(pairs);
+        assertEquals("foo:bar", pairs.get(0));
+        assertEquals("baz", pairs.get(1));
+    }
+
+    @Test
+    void resolve_mapWithEscapedColon_preservesColon() {
+        String result = MessageResolver.resolve(
+                "Val: {key|map:foo\\:bar:baz}",
+                Map.of("key", "foo:bar"),
+                null,
+                warningTracker,
+                PluginConfig.builder().build()
+        );
+        assertEquals("Val: baz", result);
+    }
 }

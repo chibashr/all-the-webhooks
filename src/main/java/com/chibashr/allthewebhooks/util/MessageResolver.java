@@ -1,6 +1,8 @@
 package com.chibashr.allthewebhooks.util;
 
 import com.chibashr.allthewebhooks.config.PluginConfig;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -13,6 +15,7 @@ import java.util.regex.Pattern;
 public final class MessageResolver {
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{([^}]+)\\}");
     private static final String REGEX_PREFIX = "regex:";
+    private static final String MAP_PREFIX = "map:";
     private static final long REGEX_TIMEOUT_MS = 300;
 
     private static final ExecutorService REGEX_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
@@ -61,7 +64,7 @@ public final class MessageResolver {
                     }
                 } else {
                     String raw = String.valueOf(value);
-                    replacement = applyTransform(raw, transformSpec, key, warningTracker);
+                    replacement = applyTransforms(raw, transformSpec, key, warningTracker);
                 }
             }
             matcher.appendReplacement(buffer, Matcher.quoteReplacement(replacement));
@@ -71,23 +74,45 @@ public final class MessageResolver {
     }
 
     /**
-     * Applies optional regex transform to the value. If transformSpec is null or invalid,
-     * returns value unchanged. Uses a timeout to avoid ReDoS; on timeout or exception,
-     * returns the original value and optionally logs once.
+     * Applies optional transforms to the value. Transforms are chained with <code>|</code>;
+     * use <code>\|</code> for a literal pipe inside a transform. If transformSpec is null or
+     * invalid, returns value unchanged.
      */
-    static String applyTransform(String value, String transformSpec, String key, WarningTracker warningTracker) {
-        if (transformSpec == null || !transformSpec.startsWith(REGEX_PREFIX)) {
+    static String applyTransforms(String value, String transformSpec, String key, WarningTracker warningTracker) {
+        if (transformSpec == null || transformSpec.isEmpty()) {
             return value;
         }
-        RegexSpec spec = parseRegexSpec(transformSpec);
-        if (spec == null) {
+        List<String> specs = splitByUnescapedPipe(transformSpec);
+        String current = value;
+        for (String spec : specs) {
+            String trimmed = spec.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            current = applySingleTransform(current, trimmed, key, warningTracker);
+        }
+        return current;
+    }
+
+    private static String applySingleTransform(String value, String spec, String key, WarningTracker warningTracker) {
+        if (spec.startsWith(REGEX_PREFIX)) {
+            return applyRegexTransform(value, spec, key, warningTracker);
+        }
+        if (spec.startsWith(MAP_PREFIX)) {
+            return applyMapTransform(value, spec, key, warningTracker);
+        }
+        return value;
+    }
+
+    private static String applyRegexTransform(String value, String spec, String key, WarningTracker warningTracker) {
+        RegexSpec regexSpec = parseRegexSpec(spec);
+        if (regexSpec == null) {
             return value;
         }
         try {
-            Pattern pattern = Pattern.compile(spec.pattern);
-            Callable<String> task = () -> pattern.matcher(value).replaceAll(spec.replacement);
-            String result = REGEX_EXECUTOR.submit(task).get(REGEX_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            return result;
+            Pattern pattern = Pattern.compile(regexSpec.pattern);
+            Callable<String> task = () -> pattern.matcher(value).replaceAll(regexSpec.replacement);
+            return REGEX_EXECUTOR.submit(task).get(REGEX_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             if (warningTracker != null) {
                 warningTracker.warnOnce("placeholder-regex-timeout:" + key,
@@ -103,6 +128,57 @@ public final class MessageResolver {
         }
     }
 
+    private static String applyMapTransform(String value, String spec, String key, WarningTracker warningTracker) {
+        List<String> pairs = parseMapSpec(spec);
+        if (pairs == null) {
+            return value;
+        }
+        for (int i = 0; i < pairs.size() - 1; i += 2) {
+            if (value.equals(pairs.get(i))) {
+                return pairs.get(i + 1);
+            }
+        }
+        return value;
+    }
+
+    /**
+     * Splits by unescaped <code>|</code>. Use <code>\|</code> for literal pipe.
+     * Only unescapes <code>\|</code> in the result; <code>\:</code> is left for each transform to handle.
+     */
+    static List<String> splitByUnescapedPipe(String s) {
+        List<String> result = new ArrayList<>();
+        int start = 0;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '\\' && i + 1 < s.length()) {
+                i++;
+                continue;
+            }
+            if (s.charAt(i) == '|') {
+                result.add(unescapePipeOnly(s.substring(start, i)));
+                start = i + 1;
+            }
+        }
+        result.add(unescapePipeOnly(s.substring(start)));
+        return result;
+    }
+
+    /** Unescapes only <code>\|</code> to <code>|</code>; leaves <code>\:</code> unchanged. */
+    private static String unescapePipeOnly(String s) {
+        if (s == null || s.isEmpty()) {
+            return s;
+        }
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '\\' && i + 1 < s.length() && s.charAt(i + 1) == '|') {
+                sb.append('|');
+                i++;
+            } else {
+                sb.append(s.charAt(i));
+            }
+        }
+        return sb.toString();
+    }
+
     /**
      * Parses "regex:pattern:replacement" with \: escaping in pattern and replacement.
      * Returns null if the spec is invalid (e.g. no unescaped colon to separate pattern and replacement).
@@ -116,9 +192,41 @@ public final class MessageResolver {
         if (colonIndex < 0) {
             return null;
         }
-        String pattern = unescapeColons(rest.substring(0, colonIndex));
-        String replacement = unescapeColons(rest.substring(colonIndex + 1));
+        String pattern = unescape(rest.substring(0, colonIndex));
+        String replacement = unescape(rest.substring(colonIndex + 1));
         return new RegexSpec(pattern, replacement);
+    }
+
+    /**
+     * Parses "map:key1:value1:key2:value2:..." with \: escaping. Returns null if invalid (odd number of parts).
+     */
+    static List<String> parseMapSpec(String transformSpec) {
+        if (transformSpec == null || !transformSpec.startsWith(MAP_PREFIX)) {
+            return null;
+        }
+        String rest = transformSpec.substring(MAP_PREFIX.length());
+        List<String> parts = splitByUnescapedColon(rest);
+        if (parts.size() % 2 != 0) {
+            return null;
+        }
+        return parts;
+    }
+
+    private static List<String> splitByUnescapedColon(String s) {
+        List<String> result = new ArrayList<>();
+        int start = 0;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '\\' && i + 1 < s.length()) {
+                i++;
+                continue;
+            }
+            if (s.charAt(i) == ':') {
+                result.add(unescape(s.substring(start, i)));
+                start = i + 1;
+            }
+        }
+        result.add(unescape(s.substring(start)));
+        return result;
     }
 
     private static int findFirstUnescapedColon(String s) {
@@ -134,15 +242,21 @@ public final class MessageResolver {
         return -1;
     }
 
-    private static String unescapeColons(String s) {
+    /** Unescapes \: and \| to : and |. */
+    private static String unescape(String s) {
         if (s == null || s.isEmpty()) {
             return s;
         }
         StringBuilder sb = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
-            if (s.charAt(i) == '\\' && i + 1 < s.length() && s.charAt(i + 1) == ':') {
-                sb.append(':');
-                i++;
+            if (s.charAt(i) == '\\' && i + 1 < s.length()) {
+                char next = s.charAt(i + 1);
+                if (next == ':' || next == '|') {
+                    sb.append(next);
+                    i++;
+                } else {
+                    sb.append(s.charAt(i));
+                }
             } else {
                 sb.append(s.charAt(i));
             }

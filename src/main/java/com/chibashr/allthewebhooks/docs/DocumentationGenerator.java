@@ -124,7 +124,7 @@ public class DocumentationGenerator {
         builder.append("<div class=\"nav-link\" data-section=\"message-structure\">Message structure</div>\n");
         builder.append("<div class=\"nav-link\" data-section=\"conditions\">Conditions</div>\n");
         builder.append("<div class=\"nav-link\" data-section=\"webhook-display-name\">Webhook display name</div>\n");
-        builder.append("<div class=\"nav-link\" data-section=\"regex\">Regex</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"placeholder-transforms\">Placeholder transforms</div>\n");
         builder.append("<div class=\"nav-link\" data-section=\"entity-reference\">Entity field reference</div>\n");
         builder.append("</div>\n");
         builder.append("</div>\n");
@@ -251,8 +251,8 @@ public class DocumentationGenerator {
         builder.append("<div id=\"webhook-display-namePanel\" class=\"panel\">\n");
         builder.append(innerContent(buildWebhookDisplayNameSection()));
         builder.append("</div>\n");
-        builder.append("<div id=\"regexPanel\" class=\"panel\"><div id=\"regex\" data-anchor=\"regex\">\n");
-        builder.append(innerContent(buildPlaceholderRegexSpecSection()));
+        builder.append("<div id=\"placeholder-transformsPanel\" class=\"panel\"><div id=\"placeholder-transforms\" data-anchor=\"placeholder-transforms\">\n");
+        builder.append(innerContent(buildPlaceholderTransformsSection()));
         builder.append("</div></div>\n");
         builder.append("<div id=\"entity-referencePanel\" class=\"panel\">\n");
         builder.append(innerContent(buildEntityReferenceSection()));
@@ -296,7 +296,7 @@ public class DocumentationGenerator {
         builder.append(buildMessageStructureSection());
         builder.append(buildConditionsSection());
         builder.append(buildWebhookDisplayNameSection());
-        builder.append(buildPlaceholderRegexSpecSection());
+        builder.append(buildPlaceholderTransformsSection());
         builder.append(buildEventsContent(events, true));
         return builder.toString();
     }
@@ -454,35 +454,40 @@ public class DocumentationGenerator {
         return builder.toString();
     }
 
-    private String buildPlaceholderRegexSpecSection() {
+    private String buildPlaceholderTransformsSection() {
         StringBuilder builder = new StringBuilder();
-        builder.append("<section id=\"regex\" class=\"doc-section\" data-anchor=\"regex\">\n");
-        builder.append("<h1>Regex</h1>\n");
+        builder.append("<section id=\"placeholder-transforms\" class=\"doc-section\" data-anchor=\"placeholder-transforms\">\n");
+        builder.append("<h1>Placeholder transforms</h1>\n");
 
         builder.append("<h3>Scope</h3>\n");
-        builder.append("<p>Message placeholder resolution can transform a placeholder value before substitution using a regex replace. ");
-        builder.append("Only the resolution step in <code>MessageResolver</code> is affected; event context building is unchanged.</p>\n");
+        builder.append("<p>Message placeholder resolution can transform a placeholder value before substitution. ");
+        builder.append("Only the resolution step in <code>MessageResolver</code> is affected; event context building is unchanged. ");
+        builder.append("If the key is redacted, <code>[REDACTED]</code> is substituted and no transforms run.</p>\n");
 
         builder.append("<h3>Syntax</h3>\n");
         builder.append("<p><strong>Simple placeholder:</strong> <code>{key}</code> uses the context value for <code>key</code> with no transform.</p>\n");
-        builder.append("<p><strong>Placeholder with regex replace:</strong> <code>{key|regex:pattern:replacement}</code></p>\n");
-        builder.append("<ul>\n");
-        builder.append("<li><code>key</code>: the part before <code>|</code> (trimmed); context lookup and redaction use this key.</li>\n");
-        builder.append("<li><code>pattern</code>: Java <code>Pattern</code> regex (no flags). First unescaped colon after <code>regex:</code> separates pattern from replacement.</li>\n");
-        builder.append("<li><code>replacement</code>: Java <code>Matcher.replaceAll</code> replacement string; <code>$1</code>, <code>$2</code>, … for capture groups, <code>$$</code> for literal <code>$</code>.</li>\n");
-        builder.append("<li>Semantics: get context value for <code>key</code>, then <code>Pattern.compile(pattern).matcher(value).replaceAll(replacement)</code>; substitute the result. If the key is redacted, <code>[REDACTED]</code> is substituted and no transform runs.</li>\n");
-        builder.append("</ul>\n");
-        builder.append("<p><strong>Escaping colons:</strong> To include a literal colon in <code>pattern</code> or <code>replacement</code>, escape it as <code>\\:</code>. ");
-        builder.append("Example: <code>{key|regex:foo\\:bar:baz\\:qux}</code> uses pattern <code>foo:bar</code> and replacement <code>baz:qux</code>.</p>\n");
-        builder.append("<p><strong>Invalid or missing transform:</strong> If there is no <code>|</code>, or the part after <code>|</code> does not start with <code>regex:</code>, or there is no unescaped colon to split pattern and replacement, the value is used unchanged. Reserved for later: other transform names (e.g. <code>{key|last-path-segment}</code>).</p>\n");
+        builder.append("<p><strong>Placeholder with transforms:</strong> <code>{key|transform:args}</code> or <code>{key|transform1:args1|transform2:args2}</code> (chained, left-to-right).</p>\n");
+        builder.append("<p>Use <code>\\:</code> for literal colon in args; use <code>\\|</code> for literal pipe when chaining (e.g. regex pattern with alternation).</p>\n");
 
-        builder.append("<h3>Example</h3>\n");
-        builder.append("<pre>**{world.name|regex:.*/([^/]+)/[^/]+$:$1}** has been loaded</pre>\n");
-        builder.append("<p>For <code>world.name</code> = <code>2026/02/hardcore-26/world</code>, the pattern captures the second-to-last path segment; <code>$1</code> yields <code>hardcore-26</code>.</p>\n");
-        builder.append("<pre>**hardcore-26** has been loaded</pre>\n");
+        builder.append("<h3>Built-in transforms</h3>\n");
+        builder.append("<h4>regex</h4>\n");
+        builder.append("<p><code>{key|regex:pattern:replacement}</code> — Java regex replace. First unescaped colon after <code>regex:</code> separates pattern from replacement.</p>\n");
+        builder.append("<ul>\n");
+        builder.append("<li><code>pattern</code>: Java <code>Pattern</code> regex (no flags).</li>\n");
+        builder.append("<li><code>replacement</code>: <code>Matcher.replaceAll</code> string; <code>$1</code>, <code>$2</code>, … for capture groups, <code>$$</code> for literal <code>$</code>.</li>\n");
+        builder.append("</ul>\n");
+        builder.append("<p><strong>Example:</strong> <code>**{world.name|regex:.*/([^/]+)/[^/]+$:$1}** has been loaded</code> — for <code>world.name</code> = <code>2026/02/hardcore-26/world</code>, yields <code>**hardcore-26** has been loaded</code>.</p>\n");
+
+        builder.append("<h4>map</h4>\n");
+        builder.append("<p><code>{key|map:key1:value1:key2:value2:...}</code> — exact string mapping. If the value equals <code>key1</code>, substitute <code>value1</code>; else if equals <code>key2</code>, substitute <code>value2</code>; etc. No match leaves the value unchanged.</p>\n");
+        builder.append("<p><strong>Example:</strong> <code>{world.hardcore|map:true:hardcore:false:normal}</code> — maps boolean strings to readable labels.</p>\n");
+        builder.append("<p><strong>Chained example:</strong> <code>{key|regex:^true$:hardcore|regex:^false$:normal}</code> — same result using chained regex transforms.</p>\n");
+
+        builder.append("<h3>Invalid or unknown transforms</h3>\n");
+        builder.append("<p>If there is no <code>|</code>, or the transform name is unknown, or args are invalid, the value is used unchanged. A one-time warning is logged per placeholder key on error.</p>\n");
 
         builder.append("<h3>Configuration</h3>\n");
-        builder.append("<p>No YAML config for regex in v1; the syntax is only in message template strings.</p>\n");
+        builder.append("<p>No YAML config for transforms in v1; the syntax is only in message template strings.</p>\n");
 
         builder.append("<h3>Security</h3>\n");
         builder.append("<p>Regex runs with a 300 ms timeout in a single-thread executor. On timeout, <code>PatternSyntaxException</code>, or any other exception, the resolver uses the untransformed value and logs a one-time warning per placeholder key.</p>\n");
@@ -841,7 +846,7 @@ public class DocumentationGenerator {
         builder.append("    link.addEventListener('click', () => {\n");
         builder.append("      const section = link.getAttribute('data-section');\n");
         builder.append("      if (!section) return;\n");
-        builder.append("      const titles = { 'welcome': 'All the Webhooks', 'quick-start': 'Quick start', 'event-keys': 'Event key hierarchy', 'message-structure': 'Message structure', 'conditions': 'Conditions', 'webhook-display-name': 'Webhook display name', 'regex': 'Regex', 'entity-reference': 'Entity field reference' };\n");
+        builder.append("      const titles = { 'welcome': 'All the Webhooks', 'quick-start': 'Quick start', 'event-keys': 'Event key hierarchy', 'message-structure': 'Message structure', 'conditions': 'Conditions', 'webhook-display-name': 'Webhook display name', 'placeholder-transforms': 'Placeholder transforms', 'entity-reference': 'Entity field reference' };\n");
         builder.append("      breadcrumb.innerHTML = '<span class=\"breadcrumb-item active\">' + (titles[section] || section) + '</span>';\n");
         builder.append("      headerTitle.textContent = titles[section] || section;\n");
         builder.append("      headerMeta.textContent = '';\n");

@@ -19,7 +19,7 @@ A **Paper-** and **Folia-** compatible Minecraft plugin that forwards **in-game 
 1. **Event discovery** — The plugin discovers Bukkit/Paper event classes and builds dot-notation keys. When an event fires, it builds an **event context** (key + key/value map from the event). Context enrichment adds fields from entities in scope (World, Player, Block)—e.g. `world.environment` is available for `player.death`.
 2. **Rule resolution** — For each event, the plugin finds the best-matching rule in `events.yaml` (exact match, then more specific wildcards). Optional world overrides apply.
 3. **Checks** — Rule enabled, optional permission, conditions (e.g. `equals`, `greater-than`), and rate limiting are applied.
-4. **Message** — The chosen template from `messages.yaml` is filled with placeholders (e.g. `{player.name}`) and optional regex transforms (`{key|regex:pattern:replacement}`). Redaction is applied to configured fields.
+4. **Message** — The chosen template from `messages.yaml` is filled with placeholders (e.g. `{player.name}`) and optional transforms (`{key|regex:pattern:replacement}`, `{key|map:true:hardcore:false:normal}`). Redaction is applied to configured fields.
 5. **Dispatch** — A JSON payload is sent to the webhook URL via HTTP POST, asynchronously and with configurable rate limits.
 
 ---
@@ -50,7 +50,7 @@ The plugin generates documentation from the **actual runtime event registry**, s
 
 | File | Purpose |
 |------|---------|
-| `docs.html` | Main user-facing docs: overview, event list by category, placeholders, entity field reference, and regex reference |
+| `docs.html` | Main user-facing docs: overview, event list by category, placeholders, entity field reference, and transform reference |
 | `events.json` | Machine-readable list of event keys and metadata |
 
 **When it runs:**
@@ -59,7 +59,7 @@ The plugin generates documentation from the **actual runtime event registry**, s
 - **On reload** — If `documentation.generate-on-reload: true`.
 - **On demand** — `/allthewebhooks docs generate` (runs async so it does not block the server).
 
-Docs are **offline-first**: no hosted site or internet required. Open `docs.html` in a browser to browse events by category, see placeholders per event (including context-enriched fields from World, Player, Block), use the entity field reference, and the regex transform reference.
+Docs are **offline-first**: no hosted site or internet required. Open `docs.html` in a browser to browse events by category, see placeholders per event (including context-enriched fields from World, Player, Block), use the entity field reference, and the placeholder transform reference (regex, map).
 
 ---
 
@@ -67,7 +67,7 @@ Docs are **offline-first**: no hosted site or internet required. Open `docs.html
 
 - **config.yaml** — Webhook URLs and timeouts, global rate limit, async/Folia, redaction fields, logging and doc generation options, command permissions.
 - **events.yaml** — Defaults (enabled, webhook, message, permission), optional world overrides, and event rules: event key (or wildcard) → message template, conditions, optional permission.
-- **messages.yaml** — Named message templates with `{placeholder}` (including context-enriched fields like `{world.environment}`) and optional `{key|regex:pattern:replacement}`.
+- **messages.yaml** — Named message templates with `{placeholder}` (including context-enriched fields like `{world.environment}`) and optional transforms (`{key|regex:pattern:replacement}`, `{key|map:key1:value1:key2:value2}`).
 
 ---
 

@@ -126,6 +126,10 @@ public class DocumentationGenerator {
         builder.append("<div class=\"nav-link\" data-section=\"webhook-display-name\">Webhook display name</div>\n");
         builder.append("<div class=\"nav-link\" data-section=\"placeholder-transforms\">Placeholder transforms</div>\n");
         builder.append("<div class=\"nav-link\" data-section=\"entity-reference\">Entity field reference</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"commands\">Commands</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"config-reference\">Configuration reference</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"events-yaml-structure\">events.yaml structure</div>\n");
+        builder.append("<div class=\"nav-link\" data-section=\"redaction\">Redaction</div>\n");
         builder.append("</div>\n");
         builder.append("</div>\n");
         builder.append("<div class=\"sidebar-events-block\">\n");
@@ -257,6 +261,18 @@ public class DocumentationGenerator {
         builder.append("<div id=\"entity-referencePanel\" class=\"panel\">\n");
         builder.append(innerContent(buildEntityReferenceSection()));
         builder.append("</div>\n");
+        builder.append("<div id=\"commandsPanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildCommandsSection()));
+        builder.append("</div>\n");
+        builder.append("<div id=\"config-referencePanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildConfigReferenceSection()));
+        builder.append("</div>\n");
+        builder.append("<div id=\"events-yaml-structurePanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildEventsYamlStructureSection()));
+        builder.append("</div>\n");
+        builder.append("<div id=\"redactionPanel\" class=\"panel\">\n");
+        builder.append(innerContent(buildRedactionSection()));
+        builder.append("</div>\n");
         builder.append("<div id=\"eventDetailPanel\" class=\"panel\"></div>\n");
         builder.append("<script>window.__eventsData=").append(buildEventsJson(events)).append(";</script>\n");
         return builder.toString();
@@ -273,7 +289,8 @@ public class DocumentationGenerator {
         builder.append("<h1 class=\"welcome-title\">All the Webhooks</h1>\n");
         builder.append("<p class=\"welcome-text\">Configure events in <code>events.yaml</code>, messages in ");
         builder.append("<code>messages.yaml</code>, and webhooks in <code>config.yaml</code>. ");
-        builder.append("Generate docs with <code>/allthewebhooks docs generate</code>.</p>\n");
+        builder.append("Docs are written to <code>plugins/AllTheWebhooks/docs/</code>. ");
+        builder.append("Generation runs on startup (if <code>documentation.generate-on-startup</code>), on reload (if <code>documentation.generate-on-reload</code>), or via <code>/allthewebhooks docs generate</code>.</p>\n");
         builder.append("<p class=\"welcome-text\">Use the sidebar to browse documentation, events, and sub-events. ");
         builder.append("Each event includes predicates and wildcard patterns for filtering.</p>\n");
         builder.append("<div class=\"stats-grid\">\n");
@@ -369,10 +386,10 @@ public class DocumentationGenerator {
         builder.append("See <a class=\"inline-link\" href=\"#entity-reference\">Entity field reference</a> and each event's predicates for what is available.</p>\n");
         builder.append("<h3>Available operators</h3>\n");
         builder.append("<ul>\n");
-        builder.append("<li><code>equals</code> — exact match (string or number)</li>\n");
+        builder.append("<li><code>equals</code> — exact match (string or number); <code>equals</code> with a list matches if value equals any item</li>\n");
         builder.append("<li><code>not</code> — value not in list</li>\n");
         builder.append("<li><code>greater-than</code> / <code>less-than</code> — numeric comparison</li>\n");
-        builder.append("<li><code>regex</code> — pattern match</li>\n");
+        builder.append("<li><code>greater-than-or-equal</code> / <code>less-than-or-equal</code> — numeric comparison (inclusive)</li>\n");
         builder.append("</ul>\n");
         builder.append("<div class=\"example-block\">\n");
         builder.append("<div class=\"example-title\">Example: only drownings</div>\n");
@@ -385,6 +402,10 @@ public class DocumentationGenerator {
         builder.append("<div class=\"example-block\">\n");
         builder.append("<div class=\"example-title\">Example: only deaths in the Nether</div>\n");
         builder.append("<pre>events:\n  player.death:\n    message: nether_death\n    conditions:\n      world.environment:\n        equals: NETHER</pre>\n");
+        builder.append("</div>\n");
+        builder.append("<div class=\"example-block\">\n");
+        builder.append("<div class=\"example-title\">Example: numeric comparison (damage threshold)</div>\n");
+        builder.append("<pre>events:\n  entity.damage.player:\n    message: high_damage_alert\n    conditions:\n      damage.amount:\n        greater-than-or-equal: 10</pre>\n");
         builder.append("</div>\n");
         builder.append("</section>\n");
         return builder.toString();
@@ -535,12 +556,86 @@ public class DocumentationGenerator {
         return builder.toString();
     }
 
+    private String buildCommandsSection() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<section id=\"commands\" class=\"doc-section\" data-anchor=\"commands\">\n");
+        builder.append("<h1>Commands</h1>\n");
+        builder.append("<p>Commands are available with the <code>/allthewebhooks</code> prefix. Permissions are configurable via <code>config.yaml</code> under <code>commands.&lt;name&gt;.permission</code>.</p>\n");
+        builder.append("<table class=\"predicates-table\"><thead><tr><th>Command</th><th>Permission</th><th>Description</th></tr></thead><tbody>\n");
+        builder.append("<tr><td><code>/allthewebhooks reload</code></td><td>configurable</td><td>Reload config, events, and messages</td></tr>\n");
+        builder.append("<tr><td><code>/allthewebhooks stats</code></td><td>configurable</td><td>Show plugin statistics</td></tr>\n");
+        builder.append("<tr><td><code>/allthewebhooks validate</code></td><td>configurable</td><td>Validate configuration</td></tr>\n");
+        builder.append("<tr><td><code>/allthewebhooks docs generate</code></td><td>configurable</td><td>Generate documentation HTML</td></tr>\n");
+        builder.append("<tr><td><code>/allthewebhooks fire &lt;eventKey&gt; [key=value ...] [--dry-run]</code></td><td>configurable</td><td>Fire a synthetic event; optional key=value pairs for context; <code>--dry-run</code> for dry run</td></tr>\n");
+        builder.append("</tbody></table>\n");
+        builder.append("<p class=\"meta\">For <code>fire</code>: when no key=value pairs are provided, a synthetic context is used. Use <code>--dry-run</code> to test without sending to webhooks.</p>\n");
+        builder.append("</section>\n");
+        return builder.toString();
+    }
+
+    private String buildConfigReferenceSection() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<section id=\"config-reference\" class=\"doc-section\" data-anchor=\"config-reference\">\n");
+        builder.append("<h1>Configuration reference</h1>\n");
+        builder.append("<p><code>config.yaml</code> defines the plugin configuration. Main sections:</p>\n");
+        builder.append("<ul>\n");
+        builder.append("<li><code>plugin</code> — plugin-level settings</li>\n");
+        builder.append("<li><code>webhooks</code> — webhook URLs and options</li>\n");
+        builder.append("<li><code>rate-limit</code> — rate limiting (e.g. <code>events-per-second</code>)</li>\n");
+        builder.append("<li><code>execution</code> — execution behavior (e.g. <code>overflow-behavior</code>)</li>\n");
+        builder.append("<li><code>redaction</code> — <code>redaction.enabled</code>, <code>redaction.fields</code></li>\n");
+        builder.append("<li><code>logging</code> — log verbosity</li>\n");
+        builder.append("<li><code>documentation</code> — <code>generate-on-startup</code>, <code>generate-on-reload</code></li>\n");
+        builder.append("<li><code>commands</code> — per-command permissions</li>\n");
+        builder.append("</ul>\n");
+        builder.append("<p>Key options include: <code>validate-on-startup</code>, <code>events-per-second</code>, <code>overflow-behavior</code>. See the default config for defaults.</p>\n");
+        builder.append("</section>\n");
+        return builder.toString();
+    }
+
+    private String buildEventsYamlStructureSection() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<section id=\"events-yaml-structure\" class=\"doc-section\" data-anchor=\"events-yaml-structure\">\n");
+        builder.append("<h1>events.yaml structure</h1>\n");
+        builder.append("<p><code>events.yaml</code> configures event rules. Structure:</p>\n");
+        builder.append("<h3>defaults</h3>\n");
+        builder.append("<p>Global defaults for all events: <code>enabled</code>, <code>webhook</code>, <code>webhook-username</code>, <code>message</code>, <code>require-permission</code>.</p>\n");
+        builder.append("<h3>worlds</h3>\n");
+        builder.append("<p>Per-world overrides: <code>enabled</code>, <code>events</code>. Use when different worlds need different event behavior.</p>\n");
+        builder.append("<h3>Per-event options</h3>\n");
+        builder.append("<p>Each event can override <code>rate-limit.events-per-second</code> for that event.</p>\n");
+        builder.append("</section>\n");
+        return builder.toString();
+    }
+
+    private String buildRedactionSection() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<section id=\"redaction\" class=\"doc-section\" data-anchor=\"redaction\">\n");
+        builder.append("<h1>Redaction</h1>\n");
+        builder.append("<p>Enable redaction in <code>config.yaml</code> with <code>redaction.enabled</code> and <code>redaction.fields</code>. Redacted fields are replaced with <code>[REDACTED]</code> in messages; no transforms run on redacted values.</p>\n");
+        builder.append("<h3>Pattern matching</h3>\n");
+        builder.append("<p>Field patterns use dot notation. <code>player.ip</code> matches exactly; <code>nbt.*</code> matches <code>nbt.foo</code>, <code>nbt.bar</code>, etc.</p>\n");
+        builder.append("</section>\n");
+        return builder.toString();
+    }
+
     private String buildEntityReferenceSection() {
         StringBuilder builder = new StringBuilder();
         builder.append("<section id=\"entity-reference\" class=\"doc-section\" data-anchor=\"entity-reference\">\n");
         builder.append("<h1>Entity field reference</h1>\n");
         builder.append("<p class=\"meta\">Events with a World, Player, or Block in scope automatically have these fields available via ");
         builder.append("<strong>context enrichment</strong>. Use them in conditions and message placeholders.</p>\n");
+        builder.append("<div id=\"entity-server\" class=\"entity-ref-section\">\n");
+        builder.append("<h2>Server</h2>\n");
+        builder.append("<p class=\"meta\">Available for server.enable and server.disable events.</p>\n");
+        builder.append("<table class=\"predicates-table\"><thead><tr><th>Field</th><th>Type</th></tr></thead><tbody>\n");
+        builder.append("<tr><td><code>server.version</code></td><td><span class=\"type-badge string\">string</span></td></tr>\n");
+        builder.append("<tr><td><code>server.minecraft_version</code></td><td><span class=\"type-badge string\">string</span></td></tr>\n");
+        builder.append("<tr><td><code>server.name</code></td><td><span class=\"type-badge string\">string</span></td></tr>\n");
+        builder.append("<tr><td><code>server.reason</code></td><td><span class=\"type-badge string\">string</span></td></tr>\n");
+        builder.append("</tbody></table>\n");
+        builder.append("<p class=\"meta\"><code>server.reason</code> is only present on server.disable events.</p>\n");
+        builder.append("</div>\n");
         for (String entityType : EntityFieldRegistry.getEntityTypes()) {
             String id = "entity-" + entityType;
             builder.append("<div id=\"").append(id).append("\" class=\"entity-ref-section\">\n");
@@ -885,7 +980,7 @@ public class DocumentationGenerator {
         builder.append("    link.addEventListener('click', () => {\n");
         builder.append("      const section = link.getAttribute('data-section');\n");
         builder.append("      if (!section) return;\n");
-        builder.append("      const titles = { 'welcome': 'All the Webhooks', 'quick-start': 'Quick start', 'event-keys': 'Event key hierarchy', 'message-structure': 'Message structure', 'conditions': 'Conditions', 'webhook-display-name': 'Webhook display name', 'placeholder-transforms': 'Placeholder transforms', 'entity-reference': 'Entity field reference' };\n");
+        builder.append("      const titles = { 'welcome': 'All the Webhooks', 'quick-start': 'Quick start', 'event-keys': 'Event key hierarchy', 'message-structure': 'Message structure', 'conditions': 'Conditions', 'webhook-display-name': 'Webhook display name', 'placeholder-transforms': 'Placeholder transforms', 'entity-reference': 'Entity field reference', 'commands': 'Commands', 'config-reference': 'Configuration reference', 'events-yaml-structure': 'events.yaml structure', 'redaction': 'Redaction' };\n");
         builder.append("      breadcrumb.innerHTML = '<span class=\"breadcrumb-item active\">' + (titles[section] || section) + '</span>';\n");
         builder.append("      headerTitle.textContent = titles[section] || section;\n");
         builder.append("      headerMeta.textContent = '';\n");

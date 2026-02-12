@@ -198,4 +198,30 @@ class DocumentationGeneratorTest {
         assertTrue(content.contains("trim"), "Should document trim transform");
         assertTrue(content.contains("last-path-segment"), "Should document path segment transform");
     }
+
+    @Test
+    void generate_includesConditionsSection_withCorrectOperators() throws IOException {
+        EventRegistry registry = EventRegistry.createDefault();
+        DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);
+        generator.generate();
+        Path docsHtml = dataFolder.resolve("docs").resolve("docs.html");
+        String content = Files.readString(docsHtml);
+        assertTrue(content.contains("greater-than-or-equal"), "Conditions section should document greater-than-or-equal");
+        assertTrue(content.contains("less-than-or-equal"), "Conditions section should document less-than-or-equal");
+        assertFalse(content.contains("<li><code>regex</code> — pattern match</li>"),
+                "Conditions section should not list regex as an operator (regex is for placeholder transforms only)");
+    }
+
+    @Test
+    void generate_includesNewSections() throws IOException {
+        EventRegistry registry = EventRegistry.createDefault();
+        DocumentationGenerator generator = new DocumentationGenerator(plugin, registry);
+        generator.generate();
+        Path docsHtml = dataFolder.resolve("docs").resolve("docs.html");
+        String content = Files.readString(docsHtml);
+        assertTrue(content.contains("Commands"), "Should include Commands section");
+        assertTrue(content.contains("Configuration reference"), "Should include Configuration reference section");
+        assertTrue(content.contains("Redaction"), "Should include Redaction section");
+        assertTrue(content.contains("server.version"), "Should include server fields in entity reference");
+    }
 }
